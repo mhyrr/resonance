@@ -1,0 +1,34 @@
+# Dependencies
+/deps
+/_build
+/node_modules
+
+# Environment
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/cover
+/doc
+erl_crash.dump
+*.ez
+*.beam
+
+# Example app artifacts
+example/resonance_demo/_build/
+example/resonance_demo/deps/
+example/resonance_demo/priv/static/assets/
+example/resonance_demo/assets/node_modules/
+example/resonance_demo/*.db
+example/resonance_demo/*.db-*
