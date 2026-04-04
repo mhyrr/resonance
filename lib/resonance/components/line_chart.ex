@@ -15,6 +15,7 @@ defmodule Resonance.Components.LineChart do
       <div
         id={"resonance-line-#{System.unique_integer([:positive])}"}
         phx-hook="ResonanceLineChart"
+        phx-update="ignore"
         data-chart-data={Jason.encode!(@props.data)}
         data-multi-series={to_string(@props[:multi_series] || false)}
         data-title={@props[:title] || ""}

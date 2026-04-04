@@ -22,7 +22,7 @@ defmodule Resonance.Components.MetricCard do
   end
 
   defp format_value(nil, _), do: "-"
-  defp format_value(val, "currency") when is_number(val), do: "$#{Number.format(val)}"
+  defp format_value(val, "currency") when is_number(val), do: "$#{Resonance.Format.integer(val)}"
   defp format_value(val, "percent") when is_number(val), do: "#{Float.round(val * 100, 1)}%"
 
   defp format_value(val, _) when is_float(val),
@@ -51,19 +51,4 @@ defmodule Resonance.Components.MetricCard do
   defp trend_arrow(_), do: "→"
 
   defp format_trend(pct), do: "#{abs(pct)}%"
-end
-
-defmodule Number do
-  @moduledoc false
-  def format(n) when is_integer(n) do
-    n
-    |> Integer.to_string()
-    |> String.reverse()
-    |> String.replace(~r/(\d{3})(?=\d)/, "\\1,")
-    |> String.reverse()
-  end
-
-  def format(n) when is_float(n) do
-    format(round(n))
-  end
 end

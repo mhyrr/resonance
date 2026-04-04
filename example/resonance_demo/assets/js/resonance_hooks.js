@@ -136,8 +136,17 @@ function buildMultiSeries(data) {
   return Object.values(seriesMap);
 }
 
+export const ResonancePromptInput = {
+  mounted() {
+    this.handleEvent("resonance:set-prompt", ({ prompt }) => {
+      this.el.value = prompt;
+    });
+  },
+};
+
 export const ResonanceHooks = {
   ResonanceLineChart,
   ResonanceBarChart,
   ResonancePieChart,
+  ResonancePromptInput,
 };

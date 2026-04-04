@@ -13,6 +13,7 @@ defmodule Resonance.Components.BarChart do
       <div
         id={"resonance-bar-#{System.unique_integer([:positive])}"}
         phx-hook="ResonanceBarChart"
+        phx-update="ignore"
         data-chart-data={Jason.encode!(@props.data)}
         data-orientation={@props[:orientation] || "vertical"}
         data-stacked={to_string(@props[:stacked] || false)}

@@ -6,7 +6,8 @@ defmodule Resonance.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      Resonance.Registry
+      Resonance.Registry,
+      {Task.Supervisor, name: Resonance.TaskSupervisor}
     ]
 
     opts = [strategy: :one_for_one, name: Resonance.Supervisor]

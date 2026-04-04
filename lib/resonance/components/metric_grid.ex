@@ -26,12 +26,12 @@ defmodule Resonance.Components.MetricGrid do
   end
 
   defp format_value(nil, _), do: "-"
-  defp format_value(val, "currency") when is_number(val), do: "$#{Number.format(val)}"
+  defp format_value(val, "currency") when is_number(val), do: "$#{Resonance.Format.integer(val)}"
   defp format_value(val, "percent") when is_number(val), do: "#{Float.round(val * 100, 1)}%"
 
   defp format_value(val, _) when is_float(val),
     do: :erlang.float_to_binary(Float.round(val, 2), decimals: 2)
 
-  defp format_value(val, _) when is_integer(val), do: Number.format(val)
+  defp format_value(val, _) when is_integer(val), do: Resonance.Format.integer(val)
   defp format_value(val, _), do: to_string(val)
 end

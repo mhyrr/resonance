@@ -50,6 +50,18 @@ defmodule Resonance.Live.Report do
         _ -> socket
       end
 
+    # Handle prompt set from parent (e.g. clicking a suggestion)
+    socket =
+      case assigns[:set_prompt] do
+        prompt when is_binary(prompt) ->
+          socket
+          |> assign(:prompt, prompt)
+          |> push_event("resonance:set-prompt", %{prompt: prompt})
+
+        _ ->
+          socket
+      end
+
     # Allow resolver to be updated
     socket =
       if assigns[:resolver], do: assign(socket, :resolver, assigns.resolver), else: socket
@@ -69,11 +81,17 @@ defmodule Resonance.Live.Report do
     component_id = socket.assigns.id
     lv_pid = self()
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(Resonance.TaskSupervisor, fn ->
       result =
-        case Resonance.generate(prompt, context) do
-          {:ok, renderables} -> {:ok, renderables}
-          {:error, reason} -> {:error, reason}
+        try do
+          case Resonance.generate(prompt, context) do
+            {:ok, renderables} -> {:ok, renderables}
+            {:error, reason} -> {:error, reason}
+          end
+        rescue
+          e -> {:error, {:internal_error, Exception.message(e)}}
+        catch
+          :exit, reason -> {:error, {:task_exit, inspect(reason)}}
         end
 
       send_update(lv_pid, Resonance.Live.Report, id: component_id, resonance_result: result)
@@ -98,11 +116,13 @@ defmodule Resonance.Live.Report do
           <input
             type="text"
             name="prompt"
+            id={"#{@id}-prompt"}
             value={@prompt}
             placeholder="What would you like to see?"
             class="resonance-prompt-input"
             disabled={@loading}
             autocomplete="off"
+            phx-hook="ResonancePromptInput"
           />
           <button type="submit" class="resonance-generate-btn" disabled={@loading}>
             {if @loading, do: "Generating...", else: "Generate"}
@@ -140,7 +160,7 @@ defmodule Resonance.Live.Report do
   end
 
   defp render_component(%Renderable{status: :ready, component: component, props: props}) do
-    assigns = %{props: props}
+    assigns = %{__changed__: nil, props: props}
     component.render(assigns)
   end
 
@@ -166,6 +186,12 @@ defmodule Resonance.Live.Report do
 
   defp format_error({:invalid_field, field, msg}),
     do: "Invalid #{field}: #{msg}"
+
+  defp format_error({:internal_error, msg}),
+    do: "Internal error: #{msg}"
+
+  defp format_error({:task_exit, msg}),
+    do: "Report generation failed unexpectedly: #{msg}"
 
   defp format_error(error), do: inspect(error)
 end
