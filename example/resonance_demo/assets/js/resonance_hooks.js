@@ -37,7 +37,12 @@ export const ResonanceLineChart = {
       : data.map((d) => d.period || d.label);
 
     this.chart = new ApexCharts(this.el, {
-      chart: { type: "line", height: 300, toolbar: { show: false } },
+      chart: {
+        type: "line",
+        height: 300,
+        toolbar: { show: false },
+        animations: { dynamicAnimation: { enabled: true, speed: 350 } },
+      },
       series: series,
       xaxis: { categories: categories },
       stroke: { curve: "smooth", width: 2 },
@@ -59,7 +64,11 @@ export const ResonanceLineChart = {
           },
         ];
 
-    this.chart.updateSeries(series);
+    const categories = multiSeries
+      ? [...new Set(data.map((d) => d.period || d.label))]
+      : data.map((d) => d.period || d.label);
+
+    this.chart.updateOptions({ series, xaxis: { categories } });
   },
 
   destroyed() {
@@ -80,6 +89,7 @@ export const ResonanceBarChart = {
         height: 300,
         stacked: stacked,
         toolbar: { show: false },
+        animations: { dynamicAnimation: { enabled: true, speed: 350 } },
       },
       plotOptions: { bar: { horizontal: horizontal } },
       series: [{ name: title, data: data.map((d) => d.value) }],
@@ -91,9 +101,15 @@ export const ResonanceBarChart = {
 
   updated() {
     const data = parseData(this.el);
-    this.chart.updateSeries([
-      { name: this.el.dataset.title || "", data: data.map((d) => d.value) },
-    ]);
+    this.chart.updateOptions({
+      series: [
+        {
+          name: this.el.dataset.title || "",
+          data: data.map((d) => d.value),
+        },
+      ],
+      xaxis: { categories: data.map((d) => d.label || d.period) },
+    });
   },
 
   destroyed() {

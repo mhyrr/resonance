@@ -201,8 +201,14 @@ defmodule Resonance.Live.Report do
 
   defp resolve_and_stream(tool_calls, context, lv_pid, component_id) do
     tool_calls
+    |> Enum.with_index()
     |> Task.async_stream(
-      fn call -> Composer.resolve_one(call, context) end,
+      fn {call, idx} ->
+        renderable = Composer.resolve_one(call, context)
+        # Deterministic ID: same tool calls always produce same DOM IDs
+        stable_id = "#{call.name}-#{idx}"
+        %{renderable | id: stable_id}
+      end,
       timeout: 30_000,
       on_timeout: :kill_task
     )
