@@ -6,8 +6,10 @@ defmodule Resonance.Primitive do
   The LLM selects primitives based on user intent. Each primitive:
 
   1. Describes itself to the LLM via `intent_schema/0`
-  2. Resolves data via the app's resolver in `resolve/2`
-  3. Maps resolved data to a presentation component in `present/2`
+  2. Resolves data via the app's resolver and returns a `Resonance.Result`
+
+  Primitives produce truth. A separate `Resonance.Presenter` handles
+  mapping results to UI components — the developer controls that layer.
 
   ## Example
 
@@ -25,12 +27,8 @@ defmodule Resonance.Primitive do
 
         @impl true
         def resolve(params, context) do
-          # Build QueryIntent, call context.resolver
-        end
-
-        @impl true
-        def present(data, context) do
-          # Pick LineChart or BarChart based on data shape
+          # Build QueryIntent, call context.resolver, return Result
+          {:ok, %Resonance.Result{kind: :comparison, title: "...", data: data}}
         end
       end
   """
@@ -46,16 +44,13 @@ defmodule Resonance.Primitive do
   @doc """
   Resolve data for this primitive given LLM-provided parameters.
 
-  Typically builds a `Resonance.QueryIntent` from params and delegates
-  to `context.resolver` for actual data fetching.
-  """
-  @callback resolve(params :: map(), context :: map()) :: {:ok, map()} | {:error, term()}
+  Builds a `Resonance.QueryIntent` from params, delegates to
+  `context.resolver` for data fetching, and returns a normalized
+  `Resonance.Result` with the semantic kind, data, and summary.
 
-  @doc """
-  Map resolved data to a presentation component.
-
-  Returns a `Resonance.Renderable` struct with the chosen component
-  and props derived from the resolved data.
+  The Result is passed to a `Resonance.Presenter` for UI mapping —
+  primitives produce truth, presenters choose visualization.
   """
-  @callback present(data :: map(), context :: map()) :: Resonance.Renderable.t()
+  @callback resolve(params :: map(), context :: map()) ::
+              {:ok, Resonance.Result.t()} | {:error, term()}
 end

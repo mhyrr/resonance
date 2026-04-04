@@ -6,6 +6,9 @@ defmodule Resonance.Components.LineChart do
 
   use Phoenix.Component
 
+  @doc false
+  def chart_dom_id(renderable_id), do: "resonance-line-#{renderable_id}"
+
   def render(assigns) do
     assigns = assign_new(assigns, :multi_series, fn -> false end)
 

@@ -2,8 +2,8 @@ defmodule Resonance.Primitives.SegmentPopulation do
   @moduledoc """
   Semantic primitive: break a population into groups.
 
-  Maps to metric_grid (few segments with aggregate values) or
-  data_table (many segments or detail rows).
+  Returns a Result with `kind: :segmentation`. The Presenter decides
+  whether to render as a metric grid, table, or something else.
   """
 
   @behaviour Resonance.Primitive
@@ -61,51 +61,14 @@ defmodule Resonance.Primitives.SegmentPopulation do
     with {:ok, intent} <- Resonance.QueryIntent.from_params(params),
          :ok <- maybe_validate(resolver, intent, context),
          {:ok, data} <- resolver.resolve(intent, context) do
-      {:ok, %{data: data, title: params["title"] || params[:title], intent: intent}}
-    end
-  end
-
-  @impl true
-  def present(data, _context) do
-    if length(data.data) <= 6 do
-      metrics =
-        Enum.map(data.data, fn row ->
-          %{
-            label: row[:label] || row["label"] || "Segment",
-            value: row[:value] || row["value"] || row[:count] || row["count"] || 0,
-            format: detect_format(row)
-          }
-        end)
-
-      Resonance.Renderable.ready(
-        "segment_population",
-        Resonance.Components.MetricGrid,
-        %{
-          title: data.title,
-          metrics: metrics,
-          columns: min(length(metrics), 3)
-        }
-      )
-    else
-      Resonance.Renderable.ready(
-        "segment_population",
-        Resonance.Components.DataTable,
-        %{
-          title: data.title,
-          data: data.data,
-          sortable: true
-        }
-      )
-    end
-  end
-
-  defp detect_format(row) do
-    value = row[:value] || row["value"] || 0
-
-    cond do
-      is_float(value) and value < 1 -> "percent"
-      is_number(value) and value > 1000 -> "currency"
-      true -> "number"
+      {:ok,
+       %Resonance.Result{
+         kind: :segmentation,
+         title: params["title"] || params[:title],
+         data: data,
+         intent: intent,
+         summary: Resonance.Result.compute_summary(data)
+       }}
     end
   end
 

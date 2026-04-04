@@ -6,6 +6,9 @@ defmodule Resonance.Components.PieChart do
 
   use Phoenix.Component
 
+  @doc false
+  def chart_dom_id(renderable_id), do: "resonance-pie-#{renderable_id}"
+
   def render(assigns) do
     ~H"""
     <div class="resonance-component resonance-pie-chart">

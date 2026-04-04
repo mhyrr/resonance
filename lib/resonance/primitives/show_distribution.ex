@@ -2,7 +2,8 @@ defmodule Resonance.Primitives.ShowDistribution do
   @moduledoc """
   Semantic primitive: show composition or proportions of a population.
 
-  Maps to pie_chart (few categories) or bar_chart (many categories).
+  Returns a Result with `kind: :distribution`. The Presenter decides
+  whether to render as a pie chart, treemap, bar chart, or something else.
   """
 
   @behaviour Resonance.Primitive
@@ -59,33 +60,14 @@ defmodule Resonance.Primitives.ShowDistribution do
     with {:ok, intent} <- Resonance.QueryIntent.from_params(params),
          :ok <- maybe_validate(resolver, intent, context),
          {:ok, data} <- resolver.resolve(intent, context) do
-      {:ok, %{data: data, title: params["title"] || params[:title]}}
-    end
-  end
-
-  @impl true
-  def present(data, _context) do
-    if length(data.data) <= 8 do
-      Resonance.Renderable.ready(
-        "show_distribution",
-        Resonance.Components.PieChart,
-        %{
-          title: data.title,
-          data: data.data,
-          donut: true,
-          show_percentages: true
-        }
-      )
-    else
-      Resonance.Renderable.ready(
-        "show_distribution",
-        Resonance.Components.BarChart,
-        %{
-          title: data.title,
-          data: data.data,
-          orientation: "horizontal"
-        }
-      )
+      {:ok,
+       %Resonance.Result{
+         kind: :distribution,
+         title: params["title"] || params[:title],
+         data: data,
+         intent: intent,
+         summary: Resonance.Result.compute_summary(data)
+       }}
     end
   end
 

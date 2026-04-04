@@ -38,6 +38,7 @@ defmodule Resonance.Live.Report do
       |> assign(:id, assigns.id)
       |> assign_new(:resolver, fn -> assigns[:resolver] end)
       |> assign_new(:current_user, fn -> assigns[:current_user] end)
+      |> assign_new(:presenter, fn -> assigns[:presenter] end)
       |> assign_new(:components, fn -> [] end)
       |> assign_new(:loading, fn -> false end)
       |> assign_new(:prompt, fn -> "" end)
@@ -120,9 +121,12 @@ defmodule Resonance.Live.Report do
           socket
       end
 
-    # Allow resolver to be updated
+    # Allow resolver and presenter to be updated
     socket =
       if assigns[:resolver], do: assign(socket, :resolver, assigns.resolver), else: socket
+
+    socket =
+      if assigns[:presenter], do: assign(socket, :presenter, assigns.presenter), else: socket
 
     {:ok, socket}
   end
@@ -144,7 +148,8 @@ defmodule Resonance.Live.Report do
 
     context = %{
       resolver: socket.assigns.resolver,
-      current_user: socket.assigns[:current_user]
+      current_user: socket.assigns[:current_user],
+      presenter: socket.assigns[:presenter]
     }
 
     component_id = socket.assigns.id
@@ -191,7 +196,8 @@ defmodule Resonance.Live.Report do
 
     context = %{
       resolver: socket.assigns.resolver,
-      current_user: socket.assigns[:current_user]
+      current_user: socket.assigns[:current_user],
+      presenter: socket.assigns[:presenter]
     }
 
     tool_calls = socket.assigns.tool_calls
@@ -302,23 +308,16 @@ defmodule Resonance.Live.Report do
 
   defp render_component(_), do: nil
 
-  defp push_chart_update(socket, %Renderable{} = renderable) do
-    case chart_dom_id(renderable) do
-      nil -> socket
-      dom_id ->
-        push_event(socket, "resonance:update-chart", %{
-          id: dom_id,
-          data: renderable.props[:data] || renderable.props["data"] || []
-        })
-    end
-  end
+  defp push_chart_update(socket, %Renderable{component: comp, id: id} = renderable) do
+    if function_exported?(comp, :chart_dom_id, 1) do
+      dom_id = comp.chart_dom_id(id)
 
-  defp chart_dom_id(%Renderable{component: comp, id: id}) do
-    case comp do
-      Resonance.Components.BarChart -> "resonance-bar-#{id}"
-      Resonance.Components.LineChart -> "resonance-line-#{id}"
-      Resonance.Components.PieChart -> "resonance-pie-#{id}"
-      _ -> nil
+      push_event(socket, "resonance:update-chart", %{
+        id: dom_id,
+        data: renderable.props[:data] || renderable.props["data"] || []
+      })
+    else
+      socket
     end
   end
 

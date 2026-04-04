@@ -2,8 +2,8 @@ defmodule Resonance.Primitives.CompareOverTime do
   @moduledoc """
   Semantic primitive: compare a metric's values across time periods.
 
-  Maps to line_chart (time-series) or bar_chart (categorical periods)
-  depending on data shape.
+  Returns a Result with `kind: :comparison`. The Presenter decides
+  whether to render as a line chart, bar chart, or something else.
   """
 
   @behaviour Resonance.Primitive
@@ -70,39 +70,15 @@ defmodule Resonance.Primitives.CompareOverTime do
     with {:ok, intent} <- Resonance.QueryIntent.from_params(params),
          :ok <- maybe_validate(resolver, intent, context),
          {:ok, data} <- resolver.resolve(intent, context) do
-      {:ok, %{data: data, title: params["title"] || params[:title], intent: intent}}
+      {:ok,
+       %Resonance.Result{
+         kind: :comparison,
+         title: params["title"] || params[:title],
+         data: data,
+         intent: intent,
+         summary: Resonance.Result.compute_summary(data)
+       }}
     end
-  end
-
-  @impl true
-  def present(data, _context) do
-    if multi_series?(data.data, data.intent) do
-      Resonance.Renderable.ready(
-        "compare_over_time",
-        Resonance.Components.LineChart,
-        %{
-          title: data.title,
-          data: data.data,
-          multi_series: true
-        }
-      )
-    else
-      Resonance.Renderable.ready(
-        "compare_over_time",
-        Resonance.Components.BarChart,
-        %{
-          title: data.title,
-          data: data.data,
-          orientation: "vertical"
-        }
-      )
-    end
-  end
-
-  defp multi_series?(data, intent) do
-    # Multi-series if there are 2+ dimensions (time + category)
-    dims = intent.dimensions || []
-    length(dims) > 1 || length(data) > 12
   end
 
   defp maybe_validate(resolver, intent, context) do

@@ -68,10 +68,26 @@ defmodule Resonance.Primitives.CompareOverTimeTest do
     assert {:error, :forbidden} = CompareOverTime.resolve(params, %{resolver: ValidatingResolver})
   end
 
-  test "present returns a Renderable with chart component" do
-    data = %{
-      data: [%{label: "Q1", value: 100}, %{label: "Q2", value: 200}],
+  test "resolve returns a Result with kind :comparison" do
+    params = %{
+      "dataset" => "deals",
+      "measures" => ["sum(value)"],
+      "dimensions" => ["quarter"],
+      "title" => "Revenue by Quarter"
+    }
+
+    assert {:ok, result} = CompareOverTime.resolve(params, %{resolver: MockResolver})
+    assert %Resonance.Result{kind: :comparison} = result
+    assert result.title == "Revenue by Quarter"
+    assert length(result.data) == 3
+    assert result.summary.count == 3
+  end
+
+  test "default presenter maps comparison to chart component" do
+    result = %Resonance.Result{
+      kind: :comparison,
       title: "Test",
+      data: [%{label: "Q1", value: 100}, %{label: "Q2", value: 200}],
       intent: %Resonance.QueryIntent{
         dataset: "x",
         measures: ["count(*)"],
@@ -79,9 +95,9 @@ defmodule Resonance.Primitives.CompareOverTimeTest do
       }
     }
 
-    result = CompareOverTime.present(data, %{})
-    assert %Renderable{status: :ready, type: "compare_over_time"} = result
-    assert result.component in [Resonance.Components.LineChart, Resonance.Components.BarChart]
-    assert result.props.title == "Test"
+    renderable = Resonance.Presenters.Default.present(result, %{})
+    assert %Renderable{status: :ready, type: "compare_over_time"} = renderable
+    assert renderable.component in [Resonance.Components.LineChart, Resonance.Components.BarChart]
+    assert renderable.props.title == "Test"
   end
 end

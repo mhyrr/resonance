@@ -2,8 +2,8 @@ defmodule Resonance.Primitives.RankEntities do
   @moduledoc """
   Semantic primitive: order entities by a metric.
 
-  Maps to data_table (many entities) or bar_chart (top N)
-  depending on data volume.
+  Returns a Result with `kind: :ranking`. The Presenter decides
+  whether to render as a bar chart, table, or something else.
   """
 
   @behaviour Resonance.Primitive
@@ -77,32 +77,14 @@ defmodule Resonance.Primitives.RankEntities do
     with {:ok, intent} <- Resonance.QueryIntent.from_params(params),
          :ok <- maybe_validate(resolver, intent, context),
          {:ok, data} <- resolver.resolve(intent, context) do
-      {:ok, %{data: data, title: params["title"] || params[:title], limit: intent.limit}}
-    end
-  end
-
-  @impl true
-  def present(data, _context) do
-    if length(data.data) <= 10 do
-      Resonance.Renderable.ready(
-        "rank_entities",
-        Resonance.Components.BarChart,
-        %{
-          title: data.title,
-          data: data.data,
-          orientation: "horizontal"
-        }
-      )
-    else
-      Resonance.Renderable.ready(
-        "rank_entities",
-        Resonance.Components.DataTable,
-        %{
-          title: data.title,
-          data: data.data,
-          sortable: true
-        }
-      )
+      {:ok,
+       %Resonance.Result{
+         kind: :ranking,
+         title: params["title"] || params[:title],
+         data: data,
+         intent: intent,
+         summary: Resonance.Result.compute_summary(data)
+       }}
     end
   end
 

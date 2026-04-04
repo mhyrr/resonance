@@ -36,25 +36,39 @@ defmodule Resonance.Primitives.ShowDistributionTest do
     assert length(data.data) == 3
   end
 
-  test "present picks pie chart for few categories" do
-    data = %{
-      data: [%{label: "A", value: 50}, %{label: "B", value: 30}, %{label: "C", value: 20}],
-      title: "Distribution"
+  test "resolve returns Result with kind :distribution" do
+    params = %{
+      "dataset" => "deals",
+      "measures" => ["count(*)"],
+      "dimensions" => ["stage"],
+      "title" => "Deals by Stage"
     }
 
-    result = ShowDistribution.present(data, %{})
-    assert %Renderable{status: :ready} = result
-    assert result.component == Resonance.Components.PieChart
-    assert result.props.donut == true
+    assert {:ok, result} = ShowDistribution.resolve(params, %{resolver: MockResolver})
+    assert result.kind == :distribution
   end
 
-  test "present picks bar chart for many categories" do
-    data = %{
-      data: Enum.map(1..12, fn i -> %{label: "Cat #{i}", value: i * 10} end),
-      title: "Many Categories"
+  test "default presenter picks pie chart for few categories" do
+    result = %Resonance.Result{
+      kind: :distribution,
+      title: "Distribution",
+      data: [%{label: "A", value: 50}, %{label: "B", value: 30}, %{label: "C", value: 20}]
     }
 
-    result = ShowDistribution.present(data, %{})
-    assert result.component == Resonance.Components.BarChart
+    renderable = Resonance.Presenters.Default.present(result, %{})
+    assert %Renderable{status: :ready} = renderable
+    assert renderable.component == Resonance.Components.PieChart
+    assert renderable.props.donut == true
+  end
+
+  test "default presenter picks bar chart for many categories" do
+    result = %Resonance.Result{
+      kind: :distribution,
+      title: "Many Categories",
+      data: Enum.map(1..12, fn i -> %{label: "Cat #{i}", value: i * 10} end)
+    }
+
+    renderable = Resonance.Presenters.Default.present(result, %{})
+    assert renderable.component == Resonance.Components.BarChart
   end
 end

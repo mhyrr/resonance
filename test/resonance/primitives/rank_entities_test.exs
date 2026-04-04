@@ -32,31 +32,32 @@ defmodule Resonance.Primitives.RankEntitiesTest do
       "title" => "Top Deals"
     }
 
-    assert {:ok, data} = RankEntities.resolve(params, %{resolver: MockResolver})
-    assert data.limit == 10
+    assert {:ok, result} = RankEntities.resolve(params, %{resolver: MockResolver})
+    assert result.intent.limit == 10
+    assert result.kind == :ranking
   end
 
-  test "present picks bar chart for small datasets" do
-    data = %{
-      data: [%{label: "A", value: 10}, %{label: "B", value: 5}],
+  test "default presenter picks bar chart for small datasets" do
+    result = %Resonance.Result{
+      kind: :ranking,
       title: "Ranked",
-      limit: 10
+      data: [%{label: "A", value: 10}, %{label: "B", value: 5}]
     }
 
-    result = RankEntities.present(data, %{})
-    assert %Renderable{status: :ready} = result
-    assert result.component == Resonance.Components.BarChart
-    assert result.props.orientation == "horizontal"
+    renderable = Resonance.Presenters.Default.present(result, %{})
+    assert %Renderable{status: :ready} = renderable
+    assert renderable.component == Resonance.Components.BarChart
+    assert renderable.props.orientation == "horizontal"
   end
 
-  test "present picks data table for large datasets" do
-    data = %{
-      data: Enum.map(1..15, fn i -> %{label: "Item #{i}", value: i} end),
+  test "default presenter picks data table for large datasets" do
+    result = %Resonance.Result{
+      kind: :ranking,
       title: "Many Items",
-      limit: 25
+      data: Enum.map(1..15, fn i -> %{label: "Item #{i}", value: i} end)
     }
 
-    result = RankEntities.present(data, %{})
-    assert result.component == Resonance.Components.DataTable
+    renderable = Resonance.Presenters.Default.present(result, %{})
+    assert renderable.component == Resonance.Components.DataTable
   end
 end

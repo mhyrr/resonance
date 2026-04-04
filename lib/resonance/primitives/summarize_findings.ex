@@ -4,6 +4,9 @@ defmodule Resonance.Primitives.SummarizeFindings do
 
   Template-based — no second LLM call. Formats data into structured
   prose that highlights key findings, comparisons, and notable values.
+
+  Returns a Result with `kind: :summary` and the prose content in
+  `metadata.content`.
   """
 
   @behaviour Resonance.Primitive
@@ -66,21 +69,17 @@ defmodule Resonance.Primitives.SummarizeFindings do
          :ok <- maybe_validate(resolver, intent, context),
          {:ok, data} <- resolver.resolve(intent, context) do
       summary = build_summary(data, params)
-      {:ok, %{content: summary, title: params["title"] || params[:title]}}
-    end
-  end
 
-  @impl true
-  def present(data, _context) do
-    Resonance.Renderable.ready(
-      "summarize_findings",
-      Resonance.Components.ProseSection,
-      %{
-        title: data.title,
-        content: data.content,
-        style: "summary"
-      }
-    )
+      {:ok,
+       %Resonance.Result{
+         kind: :summary,
+         title: params["title"] || params[:title],
+         data: data,
+         intent: intent,
+         summary: Resonance.Result.compute_summary(data),
+         metadata: %{content: summary}
+       }}
+    end
   end
 
   defp build_summary([], _params) do

@@ -44,26 +44,38 @@ defmodule Resonance.Primitives.SegmentPopulationTest do
     assert length(data.data) == 3
   end
 
-  test "present picks metric grid for few segments" do
-    data = %{
-      data: [%{label: "A", value: 10}, %{label: "B", value: 20}],
-      title: "Small",
-      intent: %Resonance.QueryIntent{dataset: "x", measures: ["count(*)"]}
+  test "resolve returns Result with kind :segmentation" do
+    params = %{
+      "dataset" => "contacts",
+      "measures" => ["count(*)"],
+      "dimensions" => ["stage"],
+      "title" => "Contacts by Stage"
     }
 
-    result = SegmentPopulation.present(data, %{})
-    assert %Renderable{status: :ready} = result
-    assert result.component == Resonance.Components.MetricGrid
+    assert {:ok, result} = SegmentPopulation.resolve(params, %{resolver: SmallResolver})
+    assert result.kind == :segmentation
   end
 
-  test "present picks data table for many segments" do
-    data = %{
-      data: Enum.map(1..10, fn i -> %{label: "S#{i}", value: i} end),
-      title: "Large",
-      intent: %Resonance.QueryIntent{dataset: "x", measures: ["count(*)"]}
+  test "default presenter picks metric grid for few segments" do
+    result = %Resonance.Result{
+      kind: :segmentation,
+      title: "Small",
+      data: [%{label: "A", value: 10}, %{label: "B", value: 20}]
     }
 
-    result = SegmentPopulation.present(data, %{})
-    assert result.component == Resonance.Components.DataTable
+    renderable = Resonance.Presenters.Default.present(result, %{})
+    assert %Renderable{status: :ready} = renderable
+    assert renderable.component == Resonance.Components.MetricGrid
+  end
+
+  test "default presenter picks data table for many segments" do
+    result = %Resonance.Result{
+      kind: :segmentation,
+      title: "Large",
+      data: Enum.map(1..10, fn i -> %{label: "S#{i}", value: i} end)
+    }
+
+    renderable = Resonance.Presenters.Default.present(result, %{})
+    assert renderable.component == Resonance.Components.DataTable
   end
 end

@@ -26,18 +26,19 @@ defmodule Resonance.Primitives.SummarizeFindingsTest do
     def resolve(_intent, _context), do: {:ok, []}
   end
 
-  test "resolve generates summary prose from data" do
+  test "resolve generates summary prose in metadata" do
     params = %{
       "dataset" => "deals",
       "measures" => ["sum(value)"],
       "title" => "Summary"
     }
 
-    assert {:ok, data} = SummarizeFindings.resolve(params, %{resolver: MockResolver})
-    assert data.title == "Summary"
-    assert is_binary(data.content)
-    assert data.content =~ "4"
-    assert data.content =~ "records found"
+    assert {:ok, result} = SummarizeFindings.resolve(params, %{resolver: MockResolver})
+    assert result.title == "Summary"
+    assert result.kind == :summary
+    assert is_binary(result.metadata.content)
+    assert result.metadata.content =~ "4"
+    assert result.metadata.content =~ "records found"
   end
 
   test "resolve handles empty data" do
@@ -47,8 +48,8 @@ defmodule Resonance.Primitives.SummarizeFindingsTest do
       "title" => "Empty"
     }
 
-    assert {:ok, data} = SummarizeFindings.resolve(params, %{resolver: EmptyResolver})
-    assert data.content =~ "No data found"
+    assert {:ok, result} = SummarizeFindings.resolve(params, %{resolver: EmptyResolver})
+    assert result.metadata.content =~ "No data found"
   end
 
   test "summary includes range and top/bottom for sufficient data" do
@@ -58,10 +59,10 @@ defmodule Resonance.Primitives.SummarizeFindingsTest do
       "title" => "Detailed"
     }
 
-    assert {:ok, data} = SummarizeFindings.resolve(params, %{resolver: MockResolver})
-    assert data.content =~ "range from"
-    assert data.content =~ "Highest"
-    assert data.content =~ "Lowest"
+    assert {:ok, result} = SummarizeFindings.resolve(params, %{resolver: MockResolver})
+    assert result.metadata.content =~ "range from"
+    assert result.metadata.content =~ "Highest"
+    assert result.metadata.content =~ "Lowest"
   end
 
   test "summary includes trend line when focus is trends" do
@@ -72,16 +73,20 @@ defmodule Resonance.Primitives.SummarizeFindingsTest do
       "focus" => "trends"
     }
 
-    assert {:ok, data} = SummarizeFindings.resolve(params, %{resolver: MockResolver})
-    assert data.content =~ "trend"
+    assert {:ok, result} = SummarizeFindings.resolve(params, %{resolver: MockResolver})
+    assert result.metadata.content =~ "trend"
   end
 
-  test "present returns prose section component" do
-    data = %{content: "Some findings.", title: "Test"}
+  test "default presenter maps summary to prose section" do
+    result = %Resonance.Result{
+      kind: :summary,
+      title: "Test",
+      metadata: %{content: "Some findings."}
+    }
 
-    result = SummarizeFindings.present(data, %{})
-    assert %Renderable{status: :ready} = result
-    assert result.component == Resonance.Components.ProseSection
-    assert result.props.style == "summary"
+    renderable = Resonance.Presenters.Default.present(result, %{})
+    assert %Renderable{status: :ready} = renderable
+    assert renderable.component == Resonance.Components.ProseSection
+    assert renderable.props.style == "summary"
   end
 end
