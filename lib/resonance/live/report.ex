@@ -17,7 +17,7 @@ defmodule Resonance.Live.Report do
 
   use Phoenix.LiveComponent
 
-  alias Resonance.{Layout, Renderable}
+  alias Resonance.{Composer, Layout, LLM, Registry, Renderable}
 
   @impl true
   def mount(socket) do
