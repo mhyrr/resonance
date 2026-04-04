@@ -1,0 +1,223 @@
+/* Resonance — baseline component styles
+ *
+ * Import into your app's CSS:
+ *   @import "resonance/css/resonance.css";
+ *
+ * Or copy into your project. These styles are intentionally minimal
+ * and designed to work with or without Tailwind.
+ */
+
+/* Report container */
+.resonance-report {
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Prompt input */
+.resonance-prompt-container {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.resonance-prompt-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.resonance-prompt-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.resonance-prompt-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.resonance-generate-btn {
+  padding: 0.75rem 1.5rem;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.resonance-generate-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.resonance-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading state */
+.resonance-loading {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.resonance-loading-indicator {
+  color: #6b7280;
+  animation: resonance-pulse 2s ease-in-out infinite;
+}
+
+@keyframes resonance-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Component wrappers */
+.resonance-components {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.resonance-component-wrapper {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+}
+
+/* Component shared styles */
+.resonance-component {
+  width: 100%;
+}
+
+/* Chart titles */
+.resonance-chart-title,
+.resonance-table-title,
+.resonance-grid-title,
+.resonance-prose-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: #111827;
+}
+
+/* Data table */
+.resonance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.resonance-table th {
+  text-align: left;
+  padding: 0.75rem;
+  border-bottom: 2px solid #e5e7eb;
+  font-weight: 600;
+  color: #374151;
+  text-transform: capitalize;
+}
+
+.resonance-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+  color: #4b5563;
+}
+
+.resonance-table tr:hover td {
+  background: #f9fafb;
+}
+
+/* Metric grid */
+.resonance-metric-grid .resonance-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.resonance-grid-item {
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.375rem;
+  border: 1px solid #f3f4f6;
+}
+
+.resonance-metric-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.resonance-metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* Metric card trend */
+.resonance-metric-trend {
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.resonance-trend-up { color: #059669; }
+.resonance-trend-down { color: #dc2626; }
+.resonance-trend-flat { color: #6b7280; }
+
+/* Prose section */
+.resonance-prose {
+  line-height: 1.7;
+  color: #374151;
+}
+
+.resonance-prose-content p {
+  margin-bottom: 0.75rem;
+}
+
+.resonance-prose-content strong {
+  font-weight: 600;
+  color: #111827;
+}
+
+.resonance-prose-content em {
+  font-style: italic;
+}
+
+.resonance-prose-summary {
+  border-left: 3px solid #3b82f6;
+  padding-left: 1rem;
+}
+
+/* Error display */
+.resonance-error {
+  padding: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.375rem;
+}
+
+.resonance-error-text {
+  color: #991b1b;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.resonance-error-banner {
+  padding: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.resonance-error-banner p {
+  color: #991b1b;
+  margin: 0;
+}
