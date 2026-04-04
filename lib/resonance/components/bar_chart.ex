@@ -11,7 +11,7 @@ defmodule Resonance.Components.BarChart do
     <div class="resonance-component resonance-bar-chart">
       <h3 :if={@props[:title]} class="resonance-chart-title"><%= @props.title %></h3>
       <div
-        id={"resonance-bar-#{System.unique_integer([:positive])}"}
+        id={"resonance-bar-#{@renderable_id}"}
         phx-hook="ResonanceBarChart"
         phx-update="ignore"
         data-chart-data={Jason.encode!(@props.data)}

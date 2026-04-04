@@ -11,7 +11,7 @@ defmodule Resonance.Components.PieChart do
     <div class="resonance-component resonance-pie-chart">
       <h3 :if={@props[:title]} class="resonance-chart-title"><%= @props.title %></h3>
       <div
-        id={"resonance-pie-#{System.unique_integer([:positive])}"}
+        id={"resonance-pie-#{@renderable_id}"}
         phx-hook="ResonancePieChart"
         phx-update="ignore"
         data-chart-data={Jason.encode!(@props[:data] || [])}

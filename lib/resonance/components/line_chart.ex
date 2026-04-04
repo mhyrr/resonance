@@ -13,7 +13,7 @@ defmodule Resonance.Components.LineChart do
     <div class="resonance-component resonance-line-chart">
       <h3 :if={@props[:title]} class="resonance-chart-title"><%= @props.title %></h3>
       <div
-        id={"resonance-line-#{System.unique_integer([:positive])}"}
+        id={"resonance-line-#{@renderable_id}"}
         phx-hook="ResonanceLineChart"
         phx-update="ignore"
         data-chart-data={Jason.encode!(@props.data)}

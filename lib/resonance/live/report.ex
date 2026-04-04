@@ -220,8 +220,8 @@ defmodule Resonance.Live.Report do
     """
   end
 
-  defp render_component(%Renderable{status: :ready, component: component, props: props}) do
-    assigns = %{__changed__: nil, props: props}
+  defp render_component(%Renderable{status: :ready, component: component, props: props, id: id}) do
+    assigns = %{__changed__: nil, props: props, renderable_id: id}
     component.render(assigns)
   end
 
