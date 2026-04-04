@@ -13,6 +13,7 @@ defmodule Resonance.Components.PieChart do
       <div
         id={"resonance-pie-#{@renderable_id}"}
         phx-hook="ResonancePieChart"
+        phx-update="ignore"
 
         data-chart-data={Jason.encode!(@props[:data] || [])}
         data-donut={to_string(@props[:donut] || false)}

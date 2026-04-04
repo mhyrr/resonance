@@ -13,6 +13,7 @@ defmodule Resonance.Components.BarChart do
       <div
         id={"resonance-bar-#{@renderable_id}"}
         phx-hook="ResonanceBarChart"
+        phx-update="ignore"
 
         data-chart-data={Jason.encode!(@props.data)}
         data-orientation={@props[:orientation] || "vertical"}

@@ -49,6 +49,19 @@ export const ResonanceLineChart = {
       title: { text: "", style: { fontSize: "14px" } },
     });
     this.chart.render();
+
+    this.handleEvent("resonance:update-chart", ({ id, data }) => {
+      if (id === this.el.id) {
+        const multiSeries = this.el.dataset.multiSeries === "true";
+        const series = multiSeries
+          ? buildMultiSeries(data)
+          : [{ name: this.el.dataset.title || "", data: data.map((d) => d.value) }];
+        const categories = multiSeries
+          ? [...new Set(data.map((d) => d.period || d.label))]
+          : data.map((d) => d.period || d.label);
+        this.chart.updateOptions({ series, xaxis: { categories } });
+      }
+    });
   },
 
   updated() {
@@ -97,6 +110,15 @@ export const ResonanceBarChart = {
       title: { text: "", style: { fontSize: "14px" } },
     });
     this.chart.render();
+
+    this.handleEvent("resonance:update-chart", ({ id, data }) => {
+      if (id === this.el.id) {
+        this.chart.updateOptions({
+          series: [{ name: this.el.dataset.title || "", data: data.map((d) => d.value) }],
+          xaxis: { categories: data.map((d) => d.label || d.period) },
+        });
+      }
+    });
   },
 
   updated() {
@@ -130,6 +152,15 @@ export const ResonancePieChart = {
       title: { text: "", style: { fontSize: "14px" } },
     });
     this.chart.render();
+
+    this.handleEvent("resonance:update-chart", ({ id, data }) => {
+      if (id === this.el.id) {
+        this.chart.updateOptions({
+          series: data.map((d) => d.value),
+          labels: data.map((d) => d.label),
+        });
+      }
+    });
   },
 
   updated() {

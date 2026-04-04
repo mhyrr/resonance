@@ -44,7 +44,8 @@ defmodule Resonance.Live.Report do
       |> assign_new(:error, fn -> nil end)
 
     # Handle streaming: individual component arrivals
-    # If a renderable with the same ID exists, replace it (refresh path).
+    # If a renderable with the same ID exists, replace it in-place and
+    # push new data to the chart hook via event (bypasses phx-update="ignore").
     # Otherwise append (initial generation).
     socket =
       case assigns[:resonance_component] do
@@ -55,7 +56,9 @@ defmodule Resonance.Live.Report do
             updated = Enum.map(existing, fn r ->
               if r.id == renderable.id, do: renderable, else: r
             end)
-            assign(socket, :components, updated)
+
+            socket = assign(socket, :components, updated)
+            push_chart_update(socket, renderable)
           else
             assign(socket, :components, existing ++ [renderable])
           end
@@ -298,6 +301,26 @@ defmodule Resonance.Live.Report do
   end
 
   defp render_component(_), do: nil
+
+  defp push_chart_update(socket, %Renderable{} = renderable) do
+    case chart_dom_id(renderable) do
+      nil -> socket
+      dom_id ->
+        push_event(socket, "resonance:update-chart", %{
+          id: dom_id,
+          data: renderable.props[:data] || renderable.props["data"] || []
+        })
+    end
+  end
+
+  defp chart_dom_id(%Renderable{component: comp, id: id}) do
+    case comp do
+      Resonance.Components.BarChart -> "resonance-bar-#{id}"
+      Resonance.Components.LineChart -> "resonance-line-#{id}"
+      Resonance.Components.PieChart -> "resonance-pie-#{id}"
+      _ -> nil
+    end
+  end
 
   defp format_error({:api_error, status, %{"error" => %{"message" => msg}}}),
     do: "API error (#{status}): #{msg}"
