@@ -36,7 +36,8 @@ defmodule Resonance.LLM do
     provider.chat(prompt, tools, opts)
   end
 
-  defp build_system_prompt(context) do
+  @doc false
+  def build_system_prompt(context) do
     resolver = context[:resolver]
 
     base = """
