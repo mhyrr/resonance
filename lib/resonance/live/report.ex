@@ -78,6 +78,16 @@ defmodule Resonance.Live.Report do
           socket
       end
 
+    # Handle regenerate from parent (re-run with given prompt)
+    socket =
+      case assigns[:regenerate] do
+        prompt when is_binary(prompt) and byte_size(prompt) > 0 ->
+          start_generation(socket, prompt)
+
+        _ ->
+          socket
+      end
+
     # Allow resolver to be updated
     socket =
       if assigns[:resolver], do: assign(socket, :resolver, assigns.resolver), else: socket
@@ -87,6 +97,17 @@ defmodule Resonance.Live.Report do
 
   @impl true
   def handle_event("generate", %{"prompt" => prompt}, socket) when byte_size(prompt) > 0 do
+    {:noreply, start_generation(socket, prompt)}
+  end
+
+  def handle_event("generate", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("clear", _params, socket) do
+    {:noreply, assign(socket, components: [], loading: false, prompt: "", error: nil)}
+  end
+
+  defp start_generation(socket, prompt) do
     socket = assign(socket, loading: true, components: [], prompt: prompt, error: nil)
 
     context = %{
@@ -144,14 +165,7 @@ defmodule Resonance.Live.Report do
       end
     end)
 
-    {:noreply, socket}
-  end
-
-  def handle_event("generate", _params, socket), do: {:noreply, socket}
-
-  @impl true
-  def handle_event("clear", _params, socket) do
-    {:noreply, assign(socket, components: [], loading: false, prompt: "", error: nil)}
+    socket
   end
 
   @impl true
