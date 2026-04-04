@@ -43,9 +43,21 @@ defmodule Resonance.MixProject do
 
   defp aliases do
     [
-      "test.all": ["test", "cmd --cd example/resonance_demo mix test"],
-      "build.all": ["compile", "cmd --cd example/resonance_demo mix compile"],
-      setup: ["deps.get", "cmd --cd example/resonance_demo mix setup"]
+      "test.all": [
+        "test",
+        "cmd --cd example/resonance_demo mix test",
+        "cmd --cd example/finance_demo mix test"
+      ],
+      "build.all": [
+        "compile",
+        "cmd --cd example/resonance_demo mix compile",
+        "cmd --cd example/finance_demo mix compile"
+      ],
+      setup: [
+        "deps.get",
+        "cmd --cd example/resonance_demo mix setup",
+        "cmd --cd example/finance_demo mix setup"
+      ]
     ]
   end
 
