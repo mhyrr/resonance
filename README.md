@@ -4,14 +4,6 @@
 
 An Elixir library that lets users ask questions about application data and receive composed, app-native UI — reports, dashboards, and contextual insights — built from semantic primitives and streamed in real-time via LiveView.
 
-## Why "Resonance"?
-
-In Thomistic philosophy, *resonantia* describes what happens when a living knower's inquiry activates structured knowledge, producing insight that neither party contained independently.
-
-That's what this library does. The LLM holds compressed patterns about data visualization and user intent. Your app holds the actual data and domain logic. Neither can produce the right dashboard alone. But when the user's question passes through the LLM and activates the right primitives against real data, something emerges that wasn't in either system — a composed view that answers a question nobody pre-built a report for.
-
-The LLM is the string. The user is the plectrum. The UI is the music.
-
 ## How It Works
 
 ```
@@ -23,7 +15,7 @@ Each primitive resolves data via your app's resolver
   ↓
 System maps data to UI components (charts, tables, cards)
   ↓
-LiveView streams a composed report
+LiveView streams components progressively as they resolve
 ```
 
 The LLM does not generate UI. It selects semantic operations over your data. Resonance resolves those operations, maps them to components, and streams the result.
@@ -55,9 +47,19 @@ defmodule MyApp.DataResolver do
   @behaviour Resonance.Resolver
 
   @impl true
+  def describe do
+    """
+    Datasets:
+    - "deals" — measures: count(*), sum(value), avg(value)
+      dimensions: stage, quarter, owner
+    """
+  end
+
+  @impl true
   def resolve(%Resonance.QueryIntent{dataset: "deals"} = intent, context) do
     data =
       MyApp.Deals
+      |> scope_to_user(context.current_user)
       |> apply_filters(intent.filters)
       |> group_by_dimensions(intent.dimensions)
       |> apply_measures(intent.measures)
@@ -75,7 +77,7 @@ defmodule MyApp.DataResolver do
 end
 ```
 
-Drop the component into your LiveView:
+Drop the component into any LiveView:
 
 ```elixir
 <.live_component
@@ -84,15 +86,6 @@ Drop the component into your LiveView:
   resolver={MyApp.DataResolver}
   current_user={@current_user}
 />
-```
-
-Or call the API directly:
-
-```elixir
-{:ok, components} = Resonance.generate("Show me deal pipeline by stage", %{
-  resolver: MyApp.DataResolver,
-  current_user: user
-})
 ```
 
 ## Architecture
@@ -111,7 +104,7 @@ Or call the API directly:
 │     Semantic → UI components                │
 ├─────────────────────────────────────────────┤
 │  4. COMPOSITION ENGINE                      │
-│     Orchestration + streaming               │
+│     Parallel resolution + streaming         │
 ├─────────────────────────────────────────────┤
 │  5. PRODUCT SURFACE (LiveView)              │
 │     Where users interact                    │
@@ -157,11 +150,40 @@ Your resolver receives a structured `QueryIntent`, not strings:
 }
 ```
 
-The resolver's job: validate the intent, enforce permissions, translate to queries, return normalized data. This is where correctness and security live.
+The resolver validates the intent, enforces permissions, translates to Ecto queries, and returns normalized data. This is where correctness and security live.
+
+The `describe/0` callback tells the LLM what datasets, measures, and dimensions are available. Without it, the LLM is guessing.
+
+### Streaming
+
+Components stream progressively as each primitive resolves. The LLM call is blocking (tool calls must be known before resolution), but resolution is parallel — each primitive resolves independently and appears in the UI the instant it's ready. Layout re-orders on each arrival: metrics first, then charts, then tables, then prose.
+
+### Data Refresh
+
+The Report component stores tool calls from the LLM response. When underlying data changes, a `refresh` replays the same tool calls against fresh data — no LLM re-call, deterministic structure, sub-second update. Charts animate smoothly from old values to new via `push_event`.
+
+```elixir
+# From any parent LiveView
+send_update(Resonance.Live.Report, id: "explore", refresh: true)
+```
+
+## Presentation Components
+
+| Component | Type | JS Required |
+|-----------|------|-------------|
+| `LineChart` | Time-series / trends | ApexCharts |
+| `BarChart` | Categorical comparison | ApexCharts |
+| `PieChart` | Proportions | ApexCharts |
+| `DataTable` | Record-level data | None |
+| `MetricCard` | Single KPI with trend | None |
+| `MetricGrid` | Multiple KPIs | None |
+| `ProseSection` | Narrative text | None |
+
+Chart components use JS hooks with `phx-update="ignore"` to protect the ApexCharts DOM. Data updates are pushed via LiveView events for smooth in-place animation.
 
 ## LLM Providers
 
-Built-in support for Anthropic and OpenAI. Add custom providers by implementing the `Resonance.LLM.Provider` behaviour:
+Built-in support for Anthropic and OpenAI. Custom providers implement `Resonance.LLM.Provider`:
 
 ```elixir
 defmodule MyApp.CustomProvider do
@@ -169,7 +191,6 @@ defmodule MyApp.CustomProvider do
 
   @impl true
   def chat(prompt, tools, opts) do
-    # Format tools, make the API call, return normalized tool calls
     {:ok, [%Resonance.LLM.ToolCall{name: "...", arguments: %{}}]}
   end
 end
@@ -179,13 +200,26 @@ end
 config :resonance, provider: MyApp.CustomProvider
 ```
 
+## Programmatic API
+
+The drop-in LiveComponent handles the full lifecycle, but you can also call the API directly:
+
+```elixir
+# Batch — resolve all primitives, return when complete
+{:ok, components} = Resonance.generate(prompt, %{
+  resolver: MyApp.DataResolver,
+  current_user: user
+})
+
+# Streaming — receive components as they resolve
+Resonance.generate_stream(prompt, context, self())
+# Receive {:resonance, {:component_ready, renderable}} for each
+# Receive {:resonance, :done} when complete
+```
+
 ## Example App
 
-The `example/resonance_demo/` directory contains a full CRM demo app with:
-
-- Companies, contacts, deals, and activities
-- A resolver that translates QueryIntents to Ecto queries
-- An explore page for prompt-driven report generation
+The `example/resonance_demo/` directory contains a CRM demo with companies, contacts, deals, and activities:
 
 ```bash
 cd example/resonance_demo
@@ -194,15 +228,23 @@ ANTHROPIC_API_KEY=your_key mix phx.server
 # Visit http://localhost:4000/explore
 ```
 
+The demo includes a "Simulate New Deals" button that inserts random data and refreshes the active report in-place — useful for seeing streaming and data refresh in action.
+
 ## Development
 
 ```bash
 mix deps.get          # Install dependencies
-mix test              # Run library tests
+mix test              # Run library tests (56 tests)
 mix test.all          # Run library + demo app tests
 mix build.all         # Compile everything
 mix format            # Format code
 ```
+
+## Why "Resonance"?
+
+From the Thomistic concept *resonantia* — what happens when a living knower's inquiry activates structured knowledge, producing insight neither party contained independently.
+
+The LLM holds compressed patterns about data analysis and user intent. Your app holds the actual data and domain logic. Neither produces the right view alone. When the user's question passes through the LLM and activates the right primitives against real data, something emerges that wasn't in either system — a composed surface that answers a question nobody pre-built a report for.
 
 ## License
 
