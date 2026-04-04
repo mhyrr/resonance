@@ -42,10 +42,26 @@ defmodule Resonance.Live.Report do
       |> assign_new(:prompt, fn -> "" end)
       |> assign_new(:error, fn -> nil end)
 
-    # Handle async results from send_update
+    # Handle streaming: individual component arrivals
+    socket =
+      case assigns[:resonance_component] do
+        %Renderable{} = renderable ->
+          assign(socket, :components, socket.assigns.components ++ [renderable])
+
+        _ ->
+          socket
+      end
+
+    # Handle streaming: done signal
+    socket =
+      case assigns[:resonance_done] do
+        true -> assign(socket, loading: false)
+        _ -> socket
+      end
+
+    # Handle batch result (error path fallback)
     socket =
       case assigns[:resonance_result] do
-        {:ok, renderables} -> assign(socket, components: renderables, loading: false)
         {:error, reason} -> assign(socket, error: reason, loading: false)
         _ -> socket
       end
@@ -82,19 +98,50 @@ defmodule Resonance.Live.Report do
     lv_pid = self()
 
     Task.Supervisor.start_child(Resonance.TaskSupervisor, fn ->
-      result =
-        try do
-          case Resonance.generate(prompt, context) do
-            {:ok, renderables} -> {:ok, renderables}
-            {:error, reason} -> {:error, reason}
-          end
-        rescue
-          e -> {:error, {:internal_error, Exception.message(e)}}
-        catch
-          :exit, reason -> {:error, {:task_exit, inspect(reason)}}
-        end
+      try do
+        case LLM.chat(prompt, Registry.all_schemas(), context) do
+          {:ok, tool_calls} ->
+            tool_calls
+            |> Task.async_stream(
+              fn call -> Composer.resolve_one(call, context) end,
+              timeout: 30_000,
+              on_timeout: :kill_task
+            )
+            |> Enum.each(fn
+              {:ok, renderable} ->
+                send_update(lv_pid, __MODULE__,
+                  id: component_id,
+                  resonance_component: renderable
+                )
 
-      send_update(lv_pid, Resonance.Live.Report, id: component_id, resonance_result: result)
+              {:exit, :timeout} ->
+                send_update(lv_pid, __MODULE__,
+                  id: component_id,
+                  resonance_component: Renderable.error("unknown", :timeout)
+                )
+            end)
+
+            send_update(lv_pid, __MODULE__, id: component_id, resonance_done: true)
+
+          {:error, reason} ->
+            send_update(lv_pid, __MODULE__,
+              id: component_id,
+              resonance_result: {:error, reason}
+            )
+        end
+      rescue
+        e ->
+          send_update(lv_pid, __MODULE__,
+            id: component_id,
+            resonance_result: {:error, {:internal_error, Exception.message(e)}}
+          )
+      catch
+        :exit, reason ->
+          send_update(lv_pid, __MODULE__,
+            id: component_id,
+            resonance_result: {:error, {:task_exit, inspect(reason)}}
+          )
+      end
     end)
 
     {:noreply, socket}

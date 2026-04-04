@@ -8,6 +8,7 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   @behaviour Resonance.Resolver
 
+  require Logger
   import Ecto.Query
   alias ResonanceDemo.Repo
   alias ResonanceDemo.CRM.{Company, Contact, Deal, Activity}
@@ -299,7 +300,7 @@ defmodule ResonanceDemo.CRM.Resolver do
       %{field: "stage", op: "=", value: v}, q -> where(q, [d], d.stage == ^v)
       %{field: "quarter", op: "=", value: v}, q -> where(q, [d], d.quarter == ^v)
       %{field: "owner", op: "=", value: v}, q -> where(q, [d], d.owner == ^v)
-      _, q -> q
+      filter, q -> log_unsupported_filter("deals", filter); q
     end)
   end
 
@@ -311,7 +312,7 @@ defmodule ResonanceDemo.CRM.Resolver do
       %{field: "industry", op: "=", value: v}, q -> where(q, [c], c.industry == ^v)
       %{field: "region", op: "=", value: v}, q -> where(q, [c], c.region == ^v)
       %{field: "size", op: "=", value: v}, q -> where(q, [c], c.size == ^v)
-      _, q -> q
+      filter, q -> log_unsupported_filter("companies", filter); q
     end)
   end
 
@@ -321,7 +322,7 @@ defmodule ResonanceDemo.CRM.Resolver do
   defp apply_contact_filters(query, filters) do
     Enum.reduce(filters, query, fn
       %{field: "stage", op: "=", value: v}, q -> where(q, [c], c.stage == ^v)
-      _, q -> q
+      filter, q -> log_unsupported_filter("contacts", filter); q
     end)
   end
 
@@ -332,7 +333,7 @@ defmodule ResonanceDemo.CRM.Resolver do
     Enum.reduce(filters, query, fn
       %{field: "type", op: "=", value: v}, q -> where(q, [a], a.type == ^v)
       %{field: "outcome", op: "=", value: v}, q -> where(q, [a], a.outcome == ^v)
-      _, q -> q
+      filter, q -> log_unsupported_filter("activities", filter); q
     end)
   end
 
@@ -358,4 +359,12 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   defp apply_limit(query, nil), do: query
   defp apply_limit(query, limit), do: limit(query, ^limit)
+
+  defp log_unsupported_filter(dataset, %{field: f, op: op, value: v}) do
+    Logger.warning("[Resonance] #{dataset}: dropped unsupported filter #{f} #{op} #{inspect(v)}")
+  end
+
+  defp log_unsupported_filter(dataset, filter) do
+    Logger.warning("[Resonance] #{dataset}: dropped unrecognized filter #{inspect(filter)}")
+  end
 end

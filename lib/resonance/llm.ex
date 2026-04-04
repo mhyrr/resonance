@@ -47,6 +47,20 @@ defmodule Resonance.LLM do
     CRITICAL: You must use ONLY the exact dataset names listed below. Do not invent dataset names.
     For example, if "companies" is listed, use "companies" — not "accounts", "organizations", or "clients".
     Use only the listed measures and dimensions for each dataset.
+
+    COMPOSITION: For rich questions, combine multiple primitives. A good report uses 2-3 tools together.
+
+    Examples:
+
+    User: "Show me deals by stage"
+    → Use show_distribution with dataset "deals", dimensions ["stage"]
+
+    User: "Give me a pipeline review with trends and key metrics"
+    → Use segment_population for the stage breakdown
+    → Use compare_over_time for the trend chart
+    → Use summarize_findings for a narrative overview
+
+    Always include summarize_findings when the user asks for analysis, review, or insight — not just raw numbers.
     """
 
     if resolver && function_exported?(resolver, :describe, 0) do
