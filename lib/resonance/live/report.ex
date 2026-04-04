@@ -11,26 +11,8 @@ defmodule Resonance.Live.Report do
         current_user={@current_user}
       />
 
-  Or in a dedicated LiveView:
-
-      defmodule MyAppWeb.ExploreLive do
-        use MyAppWeb, :live_view
-
-        def mount(_params, _session, socket) do
-          {:ok, assign(socket, resolver: MyApp.DataResolver)}
-        end
-
-        def render(assigns) do
-          ~H\"\"\"
-          <.live_component
-            module={Resonance.Live.Report}
-            id="explore"
-            resolver={@resolver}
-            current_user={@current_user}
-          />
-          \"\"\"
-        end
-      end
+  No parent LiveView wiring needed — the component handles the full
+  lifecycle internally via `send_update/3`.
   """
 
   use Phoenix.LiveComponent
@@ -44,64 +26,68 @@ defmodule Resonance.Live.Report do
        components: [],
        loading: false,
        prompt: "",
-       error: nil,
-       expected_count: 0
+       error: nil
      )}
   end
 
   @impl true
   def update(assigns, socket) do
-    {:ok, assign(socket, resolver: assigns.resolver, current_user: assigns[:current_user])}
+    socket =
+      socket
+      |> assign(:id, assigns.id)
+      |> assign_new(:resolver, fn -> assigns[:resolver] end)
+      |> assign_new(:current_user, fn -> assigns[:current_user] end)
+      |> assign_new(:components, fn -> [] end)
+      |> assign_new(:loading, fn -> false end)
+      |> assign_new(:prompt, fn -> "" end)
+      |> assign_new(:error, fn -> nil end)
+
+    # Handle async results from send_update
+    socket =
+      case assigns[:resonance_result] do
+        {:ok, renderables} -> assign(socket, components: renderables, loading: false)
+        {:error, reason} -> assign(socket, error: reason, loading: false)
+        _ -> socket
+      end
+
+    # Allow resolver to be updated
+    socket =
+      if assigns[:resolver], do: assign(socket, :resolver, assigns.resolver), else: socket
+
+    {:ok, socket}
   end
 
   @impl true
   def handle_event("generate", %{"prompt" => prompt}, socket) when byte_size(prompt) > 0 do
-    socket =
-      assign(socket,
-        loading: true,
-        components: [],
-        prompt: prompt,
-        error: nil
-      )
+    socket = assign(socket, loading: true, components: [], prompt: prompt, error: nil)
 
     context = %{
       resolver: socket.assigns.resolver,
       current_user: socket.assigns[:current_user]
     }
 
-    pid = self()
+    component_id = socket.assigns.id
+    lv_pid = self()
 
     Task.start(fn ->
-      case Resonance.generate(prompt, context) do
-        {:ok, renderables} ->
-          send(pid, {:resonance_report, :complete, renderables})
+      result =
+        case Resonance.generate(prompt, context) do
+          {:ok, renderables} -> {:ok, renderables}
+          {:error, reason} -> {:error, reason}
+        end
 
-        {:error, reason} ->
-          send(pid, {:resonance_report, :error, reason})
-      end
+      send_update(lv_pid, Resonance.Live.Report, id: component_id, resonance_result: result)
     end)
 
     {:noreply, socket}
   end
 
-  def handle_event("generate", _params, socket) do
-    {:noreply, socket}
-  end
+  def handle_event("generate", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("clear", _params, socket) do
     {:noreply, assign(socket, components: [], loading: false, prompt: "", error: nil)}
   end
-
-  # These handle_info callbacks must be implemented in the parent LiveView.
-  # The parent should forward these messages to the live_component via send_update.
-  #
-  # In the parent LiveView:
-  #
-  #   def handle_info({:resonance_report, :complete, renderables}, socket) do
-  #     send_update(Resonance.Live.Report, id: "resonance-report", renderables: renderables)
-  #     {:noreply, socket}
-  #   end
 
   @impl true
   def render(assigns) do
@@ -119,13 +105,13 @@ defmodule Resonance.Live.Report do
             autocomplete="off"
           />
           <button type="submit" class="resonance-generate-btn" disabled={@loading}>
-            <%= if @loading, do: "Generating...", else: "Generate" %>
+            {if @loading, do: "Generating...", else: "Generate"}
           </button>
         </div>
       </form>
 
       <div :if={@error} class="resonance-error-banner">
-        <p>Something went wrong: <%= inspect(@error) %></p>
+        <p>Something went wrong: {format_error(@error)}</p>
       </div>
 
       <div :if={@loading} class="resonance-loading">
@@ -135,7 +121,7 @@ defmodule Resonance.Live.Report do
       <div :if={@components != []} class="resonance-components">
         <%= for component <- Layout.order(@components) do %>
           <div class="resonance-component-wrapper">
-            <%= render_component(component) %>
+            {render_component(component)}
           </div>
         <% end %>
       </div>
@@ -148,7 +134,7 @@ defmodule Resonance.Live.Report do
 
     ~H"""
     <div class="resonance-component resonance-error">
-      <p>Failed to load: <%= inspect(@error) %></p>
+      <p class="resonance-error-text">{format_error(@error)}</p>
     </div>
     """
   end
@@ -159,4 +145,27 @@ defmodule Resonance.Live.Report do
   end
 
   defp render_component(_), do: nil
+
+  defp format_error({:api_error, status, %{"error" => %{"message" => msg}}}),
+    do: "API error (#{status}): #{msg}"
+
+  defp format_error({:api_error, status, _}),
+    do: "API error (#{status})"
+
+  defp format_error({:request_failed, _}),
+    do: "Could not reach the LLM provider. Check your network and API key."
+
+  defp format_error({:unknown_primitive, name}),
+    do: "Unknown analysis type: #{name}"
+
+  defp format_error({:unsupported_query, dataset}),
+    do: "The query combination for \"#{dataset}\" is not supported yet."
+
+  defp format_error({:query_failed, msg}) when is_binary(msg),
+    do: "Data query failed: #{msg}"
+
+  defp format_error({:invalid_field, field, msg}),
+    do: "Invalid #{field}: #{msg}"
+
+  defp format_error(error), do: inspect(error)
 end
