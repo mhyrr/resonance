@@ -204,5 +204,6 @@ export const EChartsHooks = {
   EChartsLineChart,
   EChartsBarChart,
   EChartsTreemap,
-  EChartsPromptInput,
+  // Report component hardcodes this hook name for the prompt input
+  ResonancePromptInput: EChartsPromptInput,
 };
