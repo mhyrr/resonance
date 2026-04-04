@@ -56,11 +56,8 @@ defmodule ResonanceDemoWeb.ExploreLive do
 
     socket = assign(socket, data_flash: "Added #{inserted} deals worth $#{format_value(total_value)}")
 
-    # Re-fire the current report if one is active
-    prompt = socket.assigns.prompt
-    if prompt != "" do
-      send_update(Resonance.Live.Report, id: "explore-report", regenerate: prompt)
-    end
+    # Re-resolve the current report against fresh data (no LLM re-call)
+    send_update(Resonance.Live.Report, id: "explore-report", refresh: true)
 
     {:noreply, socket}
   end

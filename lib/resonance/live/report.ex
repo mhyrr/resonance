@@ -26,7 +26,8 @@ defmodule Resonance.Live.Report do
        components: [],
        loading: false,
        prompt: "",
-       error: nil
+       error: nil,
+       tool_calls: nil
      )}
   end
 
@@ -50,6 +51,13 @@ defmodule Resonance.Live.Report do
 
         _ ->
           socket
+      end
+
+    # Handle streaming: store tool calls for refresh
+    socket =
+      case assigns[:resonance_tool_calls] do
+        calls when is_list(calls) -> assign(socket, tool_calls: calls)
+        _ -> socket
       end
 
     # Handle streaming: done signal
@@ -78,11 +86,21 @@ defmodule Resonance.Live.Report do
           socket
       end
 
-    # Handle regenerate from parent (re-run with given prompt)
+    # Handle regenerate from parent (full LLM call + resolve)
     socket =
       case assigns[:regenerate] do
         prompt when is_binary(prompt) and byte_size(prompt) > 0 ->
           start_generation(socket, prompt)
+
+        _ ->
+          socket
+      end
+
+    # Handle refresh from parent (re-resolve same tool calls, no LLM)
+    socket =
+      case assigns[:refresh] do
+        true when socket.assigns.tool_calls != nil ->
+          refresh_data(socket)
 
         _ ->
           socket
@@ -122,27 +140,13 @@ defmodule Resonance.Live.Report do
       try do
         case LLM.chat(prompt, Registry.all_schemas(), context) do
           {:ok, tool_calls} ->
-            tool_calls
-            |> Task.async_stream(
-              fn call -> Composer.resolve_one(call, context) end,
-              timeout: 30_000,
-              on_timeout: :kill_task
+            # Store tool calls for future refreshes (no LLM re-call needed)
+            send_update(lv_pid, __MODULE__,
+              id: component_id,
+              resonance_tool_calls: tool_calls
             )
-            |> Enum.each(fn
-              {:ok, renderable} ->
-                send_update(lv_pid, __MODULE__,
-                  id: component_id,
-                  resonance_component: renderable
-                )
 
-              {:exit, :timeout} ->
-                send_update(lv_pid, __MODULE__,
-                  id: component_id,
-                  resonance_component: Renderable.error("unknown", :timeout)
-                )
-            end)
-
-            send_update(lv_pid, __MODULE__, id: component_id, resonance_done: true)
+            resolve_and_stream(tool_calls, context, lv_pid, component_id)
 
           {:error, reason} ->
             send_update(lv_pid, __MODULE__,
@@ -166,6 +170,57 @@ defmodule Resonance.Live.Report do
     end)
 
     socket
+  end
+
+  defp refresh_data(socket) do
+    socket = assign(socket, loading: true, components: [], error: nil)
+
+    context = %{
+      resolver: socket.assigns.resolver,
+      current_user: socket.assigns[:current_user]
+    }
+
+    tool_calls = socket.assigns.tool_calls
+    component_id = socket.assigns.id
+    lv_pid = self()
+
+    Task.Supervisor.start_child(Resonance.TaskSupervisor, fn ->
+      try do
+        resolve_and_stream(tool_calls, context, lv_pid, component_id)
+      rescue
+        e ->
+          send_update(lv_pid, __MODULE__,
+            id: component_id,
+            resonance_result: {:error, {:internal_error, Exception.message(e)}}
+          )
+      end
+    end)
+
+    socket
+  end
+
+  defp resolve_and_stream(tool_calls, context, lv_pid, component_id) do
+    tool_calls
+    |> Task.async_stream(
+      fn call -> Composer.resolve_one(call, context) end,
+      timeout: 30_000,
+      on_timeout: :kill_task
+    )
+    |> Enum.each(fn
+      {:ok, renderable} ->
+        send_update(lv_pid, __MODULE__,
+          id: component_id,
+          resonance_component: renderable
+        )
+
+      {:exit, :timeout} ->
+        send_update(lv_pid, __MODULE__,
+          id: component_id,
+          resonance_component: Renderable.error("unknown", :timeout)
+        )
+    end)
+
+    send_update(lv_pid, __MODULE__, id: component_id, resonance_done: true)
   end
 
   @impl true
