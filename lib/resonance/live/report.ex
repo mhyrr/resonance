@@ -44,10 +44,21 @@ defmodule Resonance.Live.Report do
       |> assign_new(:error, fn -> nil end)
 
     # Handle streaming: individual component arrivals
+    # If a renderable with the same ID exists, replace it (refresh path).
+    # Otherwise append (initial generation).
     socket =
       case assigns[:resonance_component] do
         %Renderable{} = renderable ->
-          assign(socket, :components, socket.assigns.components ++ [renderable])
+          existing = socket.assigns.components
+
+          if Enum.any?(existing, &(&1.id == renderable.id)) do
+            updated = Enum.map(existing, fn r ->
+              if r.id == renderable.id, do: renderable, else: r
+            end)
+            assign(socket, :components, updated)
+          else
+            assign(socket, :components, existing ++ [renderable])
+          end
 
         _ ->
           socket
@@ -173,7 +184,7 @@ defmodule Resonance.Live.Report do
   end
 
   defp refresh_data(socket) do
-    socket = assign(socket, loading: true, components: [], error: nil)
+    socket = assign(socket, loading: true, error: nil)
 
     context = %{
       resolver: socket.assigns.resolver,
