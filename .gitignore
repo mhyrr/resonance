@@ -32,3 +32,12 @@ example/resonance_demo/priv/static/assets/
 example/resonance_demo/assets/node_modules/
 example/resonance_demo/*.db
 example/resonance_demo/*.db-*
+example/finance_demo/_build/
+example/finance_demo/deps/
+example/finance_demo/priv/static/assets/
+example/finance_demo/assets/node_modules/
+example/finance_demo/*.db
+example/finance_demo/*.db-*
+
+# Playwright MCP
+.playwright-mcp/
