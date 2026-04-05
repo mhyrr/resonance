@@ -63,22 +63,9 @@ defmodule Resonance.Primitives.SummarizeFindings do
 
   @impl true
   def resolve(params, context) do
-    resolver = context[:resolver] || context["resolver"]
-
-    with {:ok, intent} <- Resonance.QueryIntent.from_params(params),
-         :ok <- maybe_validate(resolver, intent, context),
-         {:ok, data} <- resolver.resolve(intent, context) do
-      summary = build_summary(data, params)
-
-      {:ok,
-       %Resonance.Result{
-         kind: :summary,
-         title: params["title"] || params[:title],
-         data: data,
-         intent: intent,
-         summary: Resonance.Result.compute_summary(data),
-         metadata: %{content: summary}
-       }}
+    with {:ok, result} <- Resonance.Primitive.resolve_intent(:summary, params, context) do
+      summary = build_summary(result.data, params)
+      {:ok, %{result | metadata: %{content: summary}}}
     end
   end
 
@@ -158,10 +145,4 @@ defmodule Resonance.Primitives.SummarizeFindings do
 
   defp format_number(n) when is_integer(n), do: Integer.to_string(n)
   defp format_number(n), do: inspect(n)
-
-  defp maybe_validate(resolver, intent, context) do
-    if function_exported?(resolver, :validate, 2),
-      do: resolver.validate(intent, context),
-      else: :ok
-  end
 end

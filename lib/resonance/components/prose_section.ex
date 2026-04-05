@@ -29,6 +29,8 @@ defmodule Resonance.Components.ProseSection do
     |> Enum.map(fn paragraph ->
       inner =
         paragraph
+        |> Phoenix.HTML.html_escape()
+        |> Phoenix.HTML.safe_to_string()
         |> String.replace(~r/\*\*(.+?)\*\*/, "<strong>\\1</strong>")
         |> String.replace(~r/\*(.+?)\*/, "<em>\\1</em>")
 

@@ -53,4 +53,33 @@ defmodule Resonance.Primitive do
   """
   @callback resolve(params :: map(), context :: map()) ::
               {:ok, Resonance.Result.t()} | {:error, term()}
+
+  @doc """
+  Shared resolve helper for primitives that follow the standard pattern:
+  build QueryIntent -> validate -> resolve -> wrap in Result.
+
+  Handles resolver lookup, optional validation, and Result construction.
+  """
+  def resolve_intent(kind, params, context) do
+    resolver = context[:resolver] || context["resolver"]
+
+    with {:ok, intent} <- Resonance.QueryIntent.from_params(params),
+         :ok <- validate_if_implemented(resolver, intent, context),
+         {:ok, data} <- resolver.resolve(intent, context) do
+      {:ok,
+       %Resonance.Result{
+         kind: kind,
+         title: params["title"] || params[:title],
+         data: data,
+         intent: intent,
+         summary: Resonance.Result.compute_summary(data)
+       }}
+    end
+  end
+
+  defp validate_if_implemented(resolver, intent, context) do
+    if function_exported?(resolver, :validate, 2),
+      do: resolver.validate(intent, context),
+      else: :ok
+  end
 end

@@ -136,11 +136,10 @@ defmodule Resonance.QueryIntent do
 
   defp normalize_sort(nil), do: nil
 
-  defp normalize_sort(%{"field" => f, "direction" => d}) do
-    %{field: f, direction: String.to_existing_atom(d)}
-  rescue
-    ArgumentError -> %{field: f, direction: :asc}
-  end
+  defp normalize_sort(%{"field" => f, "direction" => "asc"}), do: %{field: f, direction: :asc}
+  defp normalize_sort(%{"field" => f, "direction" => "desc"}), do: %{field: f, direction: :desc}
+  defp normalize_sort(%{"field" => f, "direction" => _}), do: %{field: f, direction: :desc}
+  defp normalize_sort(%{"field" => f}), do: %{field: f, direction: :desc}
 
   defp normalize_sort(%{field: _, direction: _} = s), do: s
   defp normalize_sort(_), do: nil

@@ -39,10 +39,17 @@ defmodule Resonance do
   """
   @spec generate(String.t(), map()) :: {:ok, [Resonance.Renderable.t()]} | {:error, term()}
   def generate(prompt, context) do
-    with {:ok, tool_calls} <- LLM.chat(prompt, Registry.all_schemas(), context),
-         {:ok, renderables} <- Composer.compose(tool_calls, context) do
-      {:ok, renderables}
-    end
+    metadata = %{prompt: prompt, resolver: context[:resolver]}
+
+    :telemetry.span([:resonance, :generate], metadata, fn ->
+      result =
+        with {:ok, tool_calls} <- LLM.chat(prompt, Registry.all_schemas(), context),
+             {:ok, renderables} <- Composer.compose(tool_calls, context) do
+          {:ok, renderables}
+        end
+
+      {result, Map.put(metadata, :result, result)}
+    end)
   end
 
   @doc """

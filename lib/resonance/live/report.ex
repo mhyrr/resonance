@@ -55,9 +55,10 @@ defmodule Resonance.Live.Report do
           existing = socket.assigns.components
 
           if Enum.any?(existing, &(&1.id == renderable.id)) do
-            updated = Enum.map(existing, fn r ->
-              if r.id == renderable.id, do: renderable, else: r
-            end)
+            updated =
+              Enum.map(existing, fn r ->
+                if r.id == renderable.id, do: renderable, else: r
+              end)
 
             socket = assign(socket, :components, updated)
             push_chart_update(socket, renderable)

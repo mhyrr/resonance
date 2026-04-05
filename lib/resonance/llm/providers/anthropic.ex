@@ -13,7 +13,7 @@ defmodule Resonance.LLM.Providers.Anthropic do
   def chat(prompt, tools, opts) do
     api_key = Keyword.fetch!(opts, :api_key)
     model = Keyword.fetch!(opts, :model)
-    max_tokens = Keyword.fetch!(opts, :max_tokens)
+    max_tokens = Keyword.get(opts, :max_tokens, 4096)
 
     system = Keyword.get(opts, :system)
 
@@ -38,13 +38,21 @@ defmodule Resonance.LLM.Providers.Anthropic do
       {"content-type", "application/json"}
     ]
 
-    case Req.post(@api_url, json: body, headers: headers, receive_timeout: 60_000) do
+    req_options = Keyword.get(opts, :req_options, [])
+
+    case Req.post(
+           @api_url,
+           [json: body, headers: headers, receive_timeout: 60_000] ++ req_options
+         ) do
       {:ok, %{status: 200, body: response_body}} ->
         tool_calls = extract_tool_calls(response_body)
 
         if tool_calls == [] do
           text = extract_text(response_body)
-          Logger.warning("[Resonance] LLM returned no tool calls. Text: #{String.slice(text, 0, 200)}")
+
+          Logger.warning(
+            "[Resonance] LLM returned no tool calls. Text: #{String.slice(text, 0, 200)}"
+          )
         end
 
         {:ok, tool_calls}

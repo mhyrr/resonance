@@ -9,13 +9,15 @@ defmodule Resonance.MixProject do
       app: :resonance,
       version: @version,
       elixir: "~> 1.15",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
       name: "Resonance",
       description: "Generative analysis surfaces for Phoenix LiveView",
       source_url: @source_url,
-      package: package()
+      package: package(),
+      docs: docs()
     ]
   end
 
@@ -37,7 +39,8 @@ defmodule Resonance.MixProject do
       {:phoenix_live_view, "~> 1.0"},
       {:jason, "~> 1.0"},
       {:req, "~> 0.5"},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:telemetry, "~> 1.0"}
     ]
   end
 
@@ -60,6 +63,27 @@ defmodule Resonance.MixProject do
       ]
     ]
   end
+
+  defp docs do
+    [
+      main: "Resonance",
+      extras: ["README.md"],
+      groups_for_modules: [
+        Behaviours: [
+          Resonance.Primitive,
+          Resonance.Resolver,
+          Resonance.Presenter,
+          Resonance.LLM.Provider
+        ],
+        Primitives: ~r/Resonance\.Primitives\./,
+        Components: ~r/Resonance\.Components\./,
+        LLM: ~r/Resonance\.LLM\./
+      ]
+    ]
+  end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   defp package do
     [

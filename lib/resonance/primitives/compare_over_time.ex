@@ -65,27 +65,6 @@ defmodule Resonance.Primitives.CompareOverTime do
 
   @impl true
   def resolve(params, context) do
-    resolver = context[:resolver] || context["resolver"]
-
-    with {:ok, intent} <- Resonance.QueryIntent.from_params(params),
-         :ok <- maybe_validate(resolver, intent, context),
-         {:ok, data} <- resolver.resolve(intent, context) do
-      {:ok,
-       %Resonance.Result{
-         kind: :comparison,
-         title: params["title"] || params[:title],
-         data: data,
-         intent: intent,
-         summary: Resonance.Result.compute_summary(data)
-       }}
-    end
-  end
-
-  defp maybe_validate(resolver, intent, context) do
-    if function_exported?(resolver, :validate, 2) do
-      resolver.validate(intent, context)
-    else
-      :ok
-    end
+    Resonance.Primitive.resolve_intent(:comparison, params, context)
   end
 end

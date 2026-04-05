@@ -67,30 +67,11 @@ defmodule Resonance.Primitives.RankEntities do
 
   @impl true
   def resolve(params, context) do
-    resolver = context[:resolver] || context["resolver"]
-
     params =
       params
       |> Map.put_new("limit", 10)
       |> Map.put_new("sort", %{"field" => hd(params["measures"] || [""]), "direction" => "desc"})
 
-    with {:ok, intent} <- Resonance.QueryIntent.from_params(params),
-         :ok <- maybe_validate(resolver, intent, context),
-         {:ok, data} <- resolver.resolve(intent, context) do
-      {:ok,
-       %Resonance.Result{
-         kind: :ranking,
-         title: params["title"] || params[:title],
-         data: data,
-         intent: intent,
-         summary: Resonance.Result.compute_summary(data)
-       }}
-    end
-  end
-
-  defp maybe_validate(resolver, intent, context) do
-    if function_exported?(resolver, :validate, 2),
-      do: resolver.validate(intent, context),
-      else: :ok
+    Resonance.Primitive.resolve_intent(:ranking, params, context)
   end
 end

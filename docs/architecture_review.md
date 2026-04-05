@@ -1,6 +1,6 @@
 # Resonance Architecture Review
 
-**Reviewers:** José Valim (language design, OTP patterns, library contracts) and Chris McCord (LiveView, developer experience, Phoenix ecosystem fit)
+**AI Reviewers:** José Valim (language design, OTP patterns, library contracts) and Chris McCord (LiveView, developer experience, Phoenix ecosystem fit)
 
 **Date:** 2026-04-04
 **Scope:** Full library + both example apps, every module at function level

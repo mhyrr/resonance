@@ -33,7 +33,12 @@ defmodule Resonance.LLM do
     system_prompt = build_system_prompt(context)
     opts = config |> Keyword.drop([:provider]) |> Keyword.put(:system, system_prompt)
 
-    provider.chat(prompt, tools, opts)
+    metadata = %{provider: provider, tool_count: length(tools)}
+
+    :telemetry.span([:resonance, :llm, :call], metadata, fn ->
+      result = provider.chat(prompt, tools, opts)
+      {result, Map.put(metadata, :result, result)}
+    end)
   end
 
   @doc false
@@ -42,7 +47,9 @@ defmodule Resonance.LLM do
 
     today = Date.utc_today()
     current_month = Calendar.strftime(today, "%Y-%m")
-    last_month = today |> Date.beginning_of_month() |> Date.shift(month: -1) |> Calendar.strftime("%Y-%m")
+
+    last_month =
+      today |> Date.beginning_of_month() |> Date.shift(month: -1) |> Calendar.strftime("%Y-%m")
 
     base = """
     You are a data analysis assistant. The user will ask questions about their data.

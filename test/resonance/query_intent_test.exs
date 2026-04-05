@@ -76,5 +76,49 @@ defmodule Resonance.QueryIntentTest do
     test "rejects invalid params" do
       assert {:error, _} = QueryIntent.from_params(%{"measures" => ["count(*)"]})
     end
+
+    test "normalizes sort direction 'asc' to :asc" do
+      params = %{
+        "dataset" => "deals",
+        "measures" => ["sum(value)"],
+        "sort" => %{"field" => "value", "direction" => "asc"}
+      }
+
+      assert {:ok, intent} = QueryIntent.from_params(params)
+      assert intent.sort == %{field: "value", direction: :asc}
+    end
+
+    test "normalizes sort direction 'desc' to :desc" do
+      params = %{
+        "dataset" => "deals",
+        "measures" => ["sum(value)"],
+        "sort" => %{"field" => "value", "direction" => "desc"}
+      }
+
+      assert {:ok, intent} = QueryIntent.from_params(params)
+      assert intent.sort == %{field: "value", direction: :desc}
+    end
+
+    test "normalizes unknown sort direction to :desc" do
+      params = %{
+        "dataset" => "deals",
+        "measures" => ["sum(value)"],
+        "sort" => %{"field" => "value", "direction" => "descending"}
+      }
+
+      assert {:ok, intent} = QueryIntent.from_params(params)
+      assert intent.sort == %{field: "value", direction: :desc}
+    end
+
+    test "defaults missing sort direction to :desc" do
+      params = %{
+        "dataset" => "deals",
+        "measures" => ["sum(value)"],
+        "sort" => %{"field" => "value"}
+      }
+
+      assert {:ok, intent} = QueryIntent.from_params(params)
+      assert intent.sort == %{field: "value", direction: :desc}
+    end
   end
 end

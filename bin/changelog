@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+
+set -e
+
+# CHANGELOG exec pulled from deltafi
+
+function _sed_inplace() {
+  local UNAME
+  UNAME=$(uname)
+  if [[ "$UNAME" == 'Darwin' ]]; then
+    sed -i '' "$@"
+  else
+    sed -i "$@"
+  fi
+}
+
+GIT_ROOT=$(git rev-parse --show-toplevel)
+CHANGELOG_DIR=$GIT_ROOT/CHANGELOG
+UNRELEASED_DIR=$CHANGELOG_DIR/unreleased
+CHANGELOG_MD=$GIT_ROOT/CHANGELOG.md
+EDITOR=${EDITOR:-vim}
+
+_git_branchname() {
+  git rev-parse --abbrev-ref HEAD
+}
+
+_changelog_for_branch() {
+  local changelog_path
+  mkdir -p "$UNRELEASED_DIR"
+  local branchname
+  branchname="$(_git_branchname)"
+  changelog_path=$UNRELEASED_DIR/${branchname}.md
+  if [[ ! -f $changelog_path ]]; then
+    cat <<EOF > "$changelog_path"
+# Changes on branch \`${branchname}\`
+Document any changes on this branch here.
+##### Added
+-
+
+##### Changed
+-
+
+##### Fixed
+-
+
+##### Removed
+-
+
+##### Deprecated
+-
+
+##### Security
+-
+
+##### Tech-Debt/Refactor
+-
+
+##### Upgrade and Migration
+-
+EOF
+  git add "${changelog_path}"
+  fi
+  echo "${changelog_path}"
+}
+
+_coalesce_markdown() {
+  local version="$1"
+  local path="$2"
+  declare -A content=()
+
+  echo "### ${version} - $(date "+%Y-%m-%d")"
+  echo
+
+  if ! compgen -G "${path}/*.md" > /dev/null; then
+    echo "- No changes for this release"
+    echo
+    return
+  fi
+
+  for file in "${path}"/*.md; do
+    local header=""
+    while IFS= read -r line; do
+      [[ $line =~ ^[[:blank:]]*$ ]] && continue
+      [[ $line =~ ^-[[:blank:]]*$ ]] && continue
+      [[ $line =~ ^#\ [[:blank:]]*$ ]] && continue
+      if [[ $line =~ ^#####\  ]]; then
+        header="$line"
+      elif [[ -n "$header" ]]; then
+        content["$header"]+="$line"$'\n'
+      fi
+    done < "$file"
+  done
+
+  for value in Highlights Added Changed Fixed Removed Deprecated Security Tech-Debt/Refactor "Upgrade and Migration"; do
+    local header="##### $value"
+    [[ "${content[$header]}" == "" ]] && continue
+    echo "$header"
+    echo "${content[$header]}"
+    unset "content[$header]"
+  done
+
+  for header in "${!content[@]}"; do
+    echo "$header"
+    echo "${content[$header]}"
+  done
+
+}
+
+_revise_changelog() {
+  local version=$1
+  shift
+
+  _coalesce_markdown "$version" "$UNRELEASED_DIR"
+
+  [[ "$1" == "-d" ]] && return
+  local MARKER="---MARKER---"
+  # Update links
+  _sed_inplace "s|\(\[Unreleased\]:\)\(.*compare/\)\(.*\)\.\.\.main|\1\2${version}...main\n[${version}]:\2\3...${version}|" "$CHANGELOG_MD"
+
+  _sed_inplace "1,/^### /s/^\(### .*\)/$MARKER\n\1/" "$CHANGELOG_MD"
+
+  while IFS= read -r line; do
+    if [[ "$line" == "$MARKER" ]]; then
+      _coalesce_markdown "$version" "$UNRELEASED_DIR" >> "$CHANGELOG_MD".tmp
+    else
+      echo "$line" >> "$CHANGELOG_MD".tmp
+    fi
+  done < "$CHANGELOG_MD"
+  cp "$CHANGELOG_MD".tmp "$CHANGELOG_MD"
+  rm "$CHANGELOG_MD".tmp
+
+  _coalesce_markdown "$version" "$UNRELEASED_DIR" > "${CHANGELOG_DIR}/${version}.md"
+  rm -rf "$UNRELEASED_DIR/"*.md
+}
+
+_usage() {
+  echo "usage: changelog [<options>]"
+  echo
+  echo "<no options>          Create a changelog if missing, return full path to changelog"
+  echo "-e                    Create a changelog if missing, open in editor (Set EDITOR env var, vim default)"
+  echo "-d [<version>]        Dry run of changelog update"
+  echo "-r <version>          Update main CHANGELOG with coalesced changelogs under specified version header"
+  echo
+
+  exit 1
+}
+
+# --------------------------------------------------------------------------------------------------------
+
+
+if [[ "$#" == 0 ]]; then
+  _changelog_for_branch
+else
+  case "$1" in
+    -h|--help)
+      _usage
+      ;;
+    -e)
+      changelog_path=$(_changelog_for_branch)
+      "${EDITOR}" "${changelog_path}"
+      git add "${changelog_path}"
+      >&2 echo "Changelog written to ${changelog_path}"
+      ;;
+    -r)
+      shift
+      [[ -z "$1" ]] && _usage
+      _revise_changelog "$@"
+      rm -rf "${UNRELEASED_DIR}/*.md"
+      ;;
+    -d)
+      _revise_changelog "${2:-dry-run}" -d
+      ;;
+    *)
+      _usage
+      ;;
+  esac
+fi
+# _changelog_for_branch "$@"

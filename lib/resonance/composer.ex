@@ -12,15 +12,16 @@ defmodule Resonance.Composer do
   @doc """
   Compose all tool calls into a list of Renderables.
 
-  Resolves primitives in parallel via `Task.async_stream` and returns
-  all results once complete.
+  Resolves primitives in parallel via `Task.Supervisor.async_stream_nolink`
+  and returns all results once complete.
   """
   @spec compose([Resonance.LLM.ToolCall.t()], map()) ::
           {:ok, [Renderable.t()]} | {:error, term()}
   def compose(tool_calls, context) do
     renderables =
-      tool_calls
-      |> Task.async_stream(
+      Task.Supervisor.async_stream_nolink(
+        Resonance.TaskSupervisor,
+        tool_calls,
         fn call -> resolve_one(call, context) end,
         timeout: 30_000,
         on_timeout: :kill_task
@@ -41,9 +42,10 @@ defmodule Resonance.Composer do
   """
   @spec compose_stream([Resonance.LLM.ToolCall.t()], map(), pid()) :: :ok
   def compose_stream(tool_calls, context, pid) do
-    Task.start(fn ->
-      tool_calls
-      |> Task.async_stream(
+    Task.Supervisor.start_child(Resonance.TaskSupervisor, fn ->
+      Task.Supervisor.async_stream_nolink(
+        Resonance.TaskSupervisor,
+        tool_calls,
         fn call -> resolve_one(call, context) end,
         timeout: 30_000,
         on_timeout: :kill_task
@@ -72,28 +74,35 @@ defmodule Resonance.Composer do
   def resolve_one(%{name: name, arguments: arguments}, context) do
     Logger.info("[Resonance] Resolving primitive: #{name} with #{inspect(Map.keys(arguments))}")
 
-    case Registry.get(name) do
-      nil ->
-        Logger.warning("[Resonance] Unknown primitive: #{name}")
-        Renderable.error(name, {:unknown_primitive, name})
+    metadata = %{primitive: name}
 
-      primitive_module ->
-        case primitive_module.resolve(arguments, context) do
-          {:ok, %Result{} = result} ->
-            Logger.info(
-              "[Resonance] #{name} resolved: kind=#{result.kind} rows=#{length(result.data)}"
-            )
+    :telemetry.span([:resonance, :primitive, :resolve], metadata, fn ->
+      result =
+        case Registry.get(name) do
+          nil ->
+            Logger.warning("[Resonance] Unknown primitive: #{name}")
+            Renderable.error(name, {:unknown_primitive, name})
 
-            presenter = context[:presenter] || Resonance.Presenters.Default
-            presenter.present(result, context)
+          primitive_module ->
+            case primitive_module.resolve(arguments, context) do
+              {:ok, %Result{} = result} ->
+                Logger.info(
+                  "[Resonance] #{name} resolved: kind=#{result.kind} rows=#{length(result.data)}"
+                )
 
-          {:error, reason} ->
-            Logger.warning(
-              "[Resonance] #{name} failed: #{inspect(reason)} — args: #{inspect(arguments)}"
-            )
+                presenter = context[:presenter] || Resonance.Presenters.Default
+                presenter.present(result, context)
 
-            Renderable.error(name, reason)
+              {:error, reason} ->
+                Logger.warning(
+                  "[Resonance] #{name} failed: #{inspect(reason)} — args: #{inspect(arguments)}"
+                )
+
+                Renderable.error(name, reason)
+            end
         end
-    end
+
+      {result, Map.put(metadata, :renderable, result)}
+    end)
   end
 end
