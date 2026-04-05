@@ -5,6 +5,8 @@ defmodule Resonance.LLM.Providers.Anthropic do
 
   @behaviour Resonance.LLM.Provider
 
+  require Logger
+
   @api_url "https://api.anthropic.com/v1/messages"
 
   @impl true
@@ -19,6 +21,7 @@ defmodule Resonance.LLM.Providers.Anthropic do
       %{
         model: model,
         max_tokens: max_tokens,
+        tool_choice: %{type: "any"},
         tools: format_tools(tools),
         messages: [
           %{role: "user", content: prompt}
@@ -34,7 +37,14 @@ defmodule Resonance.LLM.Providers.Anthropic do
 
     case Req.post(@api_url, json: body, headers: headers, receive_timeout: 60_000) do
       {:ok, %{status: 200, body: response_body}} ->
-        {:ok, extract_tool_calls(response_body)}
+        tool_calls = extract_tool_calls(response_body)
+
+        if tool_calls == [] do
+          text = extract_text(response_body)
+          Logger.warning("[Resonance] LLM returned no tool calls. Text: #{String.slice(text, 0, 200)}")
+        end
+
+        {:ok, tool_calls}
 
       {:ok, %{status: status, body: error_body}} ->
         {:error, {:api_error, status, error_body}}
@@ -70,6 +80,14 @@ defmodule Resonance.LLM.Providers.Anthropic do
   end
 
   defp extract_tool_calls(_), do: []
+
+  defp extract_text(%{"content" => content}) do
+    content
+    |> Enum.filter(fn block -> block["type"] == "text" end)
+    |> Enum.map_join("\n", fn block -> block["text"] end)
+  end
+
+  defp extract_text(_), do: ""
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
