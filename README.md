@@ -20,32 +20,6 @@ LiveView streams components progressively as they resolve
 
 The LLM does not generate UI. It selects semantic operations over your data. Resonance resolves those operations, your Presenter maps them to components, and the result streams to the browser.
 
-## Beyond the Fixed Dashboard
-
-Software teams have always built UI the same way: study the users, guess what they need, build it in a lab, ship it, and hope. The result is dashboards and reports that are roughly 80% correct for roughly 80% of people. The other 20% file tickets, build spreadsheets, or learn to live without the view they actually needed.
-
-That model is ending. When a language model can interpret a user's intent and map it to structured operations over real data, the economics change. Instead of a product team anticipating every possible view and pre-building it, the user states what they want and the system composes it on demand. The view that answers "which donors lapsed this quarter and why" doesn't need to exist as a page in your app. It can be generated from the question itself, against real data, in real time.
-
-Nobody wants to have a conversation with their CRM. The output is a composed analytical surface (charts, tables, metrics, narrative) that looks and behaves like a page your team built. It just happens to be one nobody planned for.
-
-### Why a Semantic Layer
-
-Vercel's AI SDK takes the direct approach: the LLM picks React components via tool calls. Ask about weather, get a `<WeatherCard>`. Ask about stocks, get a `<StockChart>`. The model selects widgets.
-
-This works for demos. It breaks down for data analysis, because it couples the model's understanding to your component library. The LLM needs to know the difference between a bar chart and a line chart, and when to use each. Change your charting library? Update your tool definitions. Add a mobile layout? Teach the model new components. The presentation layer becomes part of the prompt.
-
-Resonance inserts a semantic layer between the LLM and the UI. The model doesn't pick a bar chart. It picks `rank_entities`, an analytical operation meaning "order these things by a metric." A Presenter inspects the resolved data and chooses the right component: a horizontal bar chart for 4 items, a sortable table for 40. Same intent, different data, different presentation, and the model never had to care.
-
-You can swap chart libraries without touching the LLM integration. You can add device-specific rendering without rewriting tool schemas. You can change how "show distribution" looks without changing what it means. The model operates on stable analytical concepts; the UI is free to evolve independently.
-
-### Why Elixir
-
-Generative UI has a pipeline problem. A user's question becomes an LLM call, which becomes tool selections, which become data queries, which become resolved components, which become rendered HTML. In most architectures, this pipeline crosses multiple process boundaries.
-
-LiveView eliminates most of that. The LLM's tool call output, the data resolution, the component rendering, and the DOM update all happen in a single server process. Components stream to the browser as WebSocket DOM diffs. Each primitive resolves independently and appears the moment it's ready.
-
-OTP adds the structural pieces that a generative system needs. Each primitive resolves inside a supervised task; if one fails, the others still render. The composition engine uses `Task.async_stream` with backpressure and timeouts. These are properties of the runtime, not features bolted onto a web framework.
-
 ## Quick Start
 
 Add to your `mix.exs`:
@@ -415,6 +389,34 @@ mix test.all          # Run library + both demo app tests
 mix build.all         # Compile everything
 mix format            # Format code
 ```
+
+## Philosophy
+
+### Beyond the Fixed Dashboard
+
+Software teams have always built UI the same way: study the users, guess what they need, build it in a lab, ship it, and hope. The result is dashboards and reports that are roughly 80% correct for roughly 80% of people. The other 20% file tickets, build spreadsheets, or learn to live without the view they actually needed.
+
+That model is ending. When a language model can interpret a user's intent and map it to structured operations over real data, the economics change. Instead of a product team anticipating every possible view and pre-building it, the user states what they want and the system composes it on demand. The view that answers "which donors lapsed this quarter and why" doesn't need to exist as a page in your app. It can be generated from the question itself, against real data, in real time.
+
+Nobody wants to have a conversation with their CRM. The output is a composed analytical surface (charts, tables, metrics, narrative) that looks and behaves like a page your team built. It just happens to be one nobody planned for.
+
+### Why a Semantic Layer
+
+Vercel's AI SDK takes the direct approach: the LLM picks React components via tool calls. Ask about weather, get a `<WeatherCard>`. Ask about stocks, get a `<StockChart>`. The model selects widgets.
+
+This works for demos. It breaks down for data analysis, because it couples the model's understanding to your component library. The LLM needs to know the difference between a bar chart and a line chart, and when to use each. Change your charting library? Update your tool definitions. Add a mobile layout? Teach the model new components. The presentation layer becomes part of the prompt.
+
+Resonance inserts a semantic layer between the LLM and the UI. The model doesn't pick a bar chart. It picks `rank_entities`, an analytical operation meaning "order these things by a metric." A Presenter inspects the resolved data and chooses the right component: a horizontal bar chart for 4 items, a sortable table for 40. Same intent, different data, different presentation, and the model never had to care.
+
+You can swap chart libraries without touching the LLM integration. You can add device-specific rendering without rewriting tool schemas. You can change how "show distribution" looks without changing what it means. The model operates on stable analytical concepts; the UI is free to evolve independently.
+
+### Why Elixir
+
+Generative UI has a pipeline problem. A user's question becomes an LLM call, which becomes tool selections, which become data queries, which become resolved components, which become rendered HTML. In most architectures, this pipeline crosses multiple process boundaries.
+
+LiveView eliminates most of that. The LLM's tool call output, the data resolution, the component rendering, and the DOM update all happen in a single server process. Components stream to the browser as WebSocket DOM diffs. Each primitive resolves independently and appears the moment it's ready.
+
+OTP adds the structural pieces that a generative system needs. Each primitive resolves inside a supervised task; if one fails, the others still render. The composition engine uses `Task.async_stream` with backpressure and timeouts. These are properties of the runtime, not features bolted onto a web framework.
 
 ## Where This Goes
 
