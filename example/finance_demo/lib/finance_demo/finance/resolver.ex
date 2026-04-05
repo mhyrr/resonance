@@ -312,9 +312,30 @@ defmodule FinanceDemo.Finance.Resolver do
 
   defp apply_transaction_filters(query, filters) do
     Enum.reduce(filters, query, fn
-      %{field: "type", op: "=", value: v}, q -> where(q, [t], t.type == ^v)
-      %{field: "merchant", op: "=", value: v}, q -> where(q, [t], t.merchant == ^v)
-      filter, q -> log_unsupported_filter("transactions", filter); q
+      %{field: "type", op: "=", value: v}, q ->
+        where(q, [t], t.type == ^v)
+
+      %{field: "merchant", op: "=", value: v}, q ->
+        where(q, [t], t.merchant == ^v)
+
+      %{field: "category", op: "=", value: v}, q ->
+        q
+        |> join(:inner, [t, ...], cat in Category,
+          on: t.category_id == cat.id,
+          as: :filter_cat
+        )
+        |> join(:left, [filter_cat: cat], parent in Category,
+          on: cat.parent_id == parent.id,
+          as: :filter_parent
+        )
+        |> where(
+          [filter_cat: cat, filter_parent: parent],
+          cat.name == ^v or parent.name == ^v
+        )
+
+      filter, q ->
+        log_unsupported_filter("transactions", filter)
+        q
     end)
   end
 
