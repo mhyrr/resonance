@@ -17,6 +17,7 @@ defmodule Resonance.Live.Report do
 
   use Phoenix.LiveComponent
 
+  require Logger
   alias Resonance.{Composer, Layout, LLM, Registry, Renderable}
 
   @impl true
@@ -159,7 +160,10 @@ defmodule Resonance.Live.Report do
       try do
         case LLM.chat(prompt, Registry.all_schemas(), context) do
           {:ok, tool_calls} ->
-            # Store tool calls for future refreshes (no LLM re-call needed)
+            Logger.info(
+              "[Resonance] LLM returned #{length(tool_calls)} tool call(s): #{Enum.map_join(tool_calls, ", ", & &1.name)}"
+            )
+
             send_update(lv_pid, __MODULE__,
               id: component_id,
               resonance_tool_calls: tool_calls
@@ -168,6 +172,8 @@ defmodule Resonance.Live.Report do
             resolve_and_stream(tool_calls, context, lv_pid, component_id)
 
           {:error, reason} ->
+            Logger.error("[Resonance] LLM call failed: #{inspect(reason)}")
+
             send_update(lv_pid, __MODULE__,
               id: component_id,
               resonance_result: {:error, reason}

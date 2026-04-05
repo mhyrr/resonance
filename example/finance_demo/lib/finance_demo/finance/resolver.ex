@@ -319,19 +319,16 @@ defmodule FinanceDemo.Finance.Resolver do
         where(q, [t], t.merchant == ^v)
 
       %{field: "category", op: "=", value: v}, q ->
-        q
-        |> join(:inner, [t, ...], cat in Category,
-          on: t.category_id == cat.id,
-          as: :filter_cat
-        )
-        |> join(:left, [filter_cat: cat], parent in Category,
-          on: cat.parent_id == parent.id,
-          as: :filter_parent
-        )
-        |> where(
-          [filter_cat: cat, filter_parent: parent],
-          cat.name == ^v or parent.name == ^v
-        )
+        # Subquery avoids conflicting with dimension joins on categories
+        cat_ids =
+          from(c in Category,
+            left_join: p in Category,
+            on: c.parent_id == p.id,
+            where: c.name == ^v or p.name == ^v,
+            select: c.id
+          )
+
+        where(q, [t], t.category_id in subquery(cat_ids))
 
       filter, q ->
         log_unsupported_filter("transactions", filter)

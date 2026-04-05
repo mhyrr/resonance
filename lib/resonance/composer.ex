@@ -6,6 +6,7 @@ defmodule Resonance.Composer do
   registered primitive for data resolution and presentation mapping.
   """
 
+  require Logger
   alias Resonance.{Registry, Renderable, Result}
 
   @doc """
@@ -69,17 +70,28 @@ defmodule Resonance.Composer do
   to produce a `Renderable`.
   """
   def resolve_one(%{name: name, arguments: arguments}, context) do
+    Logger.info("[Resonance] Resolving primitive: #{name} with #{inspect(Map.keys(arguments))}")
+
     case Registry.get(name) do
       nil ->
+        Logger.warning("[Resonance] Unknown primitive: #{name}")
         Renderable.error(name, {:unknown_primitive, name})
 
       primitive_module ->
         case primitive_module.resolve(arguments, context) do
           {:ok, %Result{} = result} ->
+            Logger.info(
+              "[Resonance] #{name} resolved: kind=#{result.kind} rows=#{length(result.data)}"
+            )
+
             presenter = context[:presenter] || Resonance.Presenters.Default
             presenter.present(result, context)
 
           {:error, reason} ->
+            Logger.warning(
+              "[Resonance] #{name} failed: #{inspect(reason)} — args: #{inspect(arguments)}"
+            )
+
             Renderable.error(name, reason)
         end
     end
