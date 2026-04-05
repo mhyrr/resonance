@@ -102,4 +102,5 @@
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
-/* This file is for your main application CSS */
+/* Resonance component styles */
+@import "../../../../assets/css/resonance.css";
