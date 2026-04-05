@@ -40,9 +40,15 @@ defmodule Resonance.LLM do
   def build_system_prompt(context) do
     resolver = context[:resolver]
 
+    today = Date.utc_today()
+    current_month = Calendar.strftime(today, "%Y-%m")
+    last_month = today |> Date.beginning_of_month() |> Date.shift(month: -1) |> Calendar.strftime("%Y-%m")
+
     base = """
     You are a data analysis assistant. The user will ask questions about their data.
     Select the appropriate semantic primitives (tools) to answer their question.
+
+    TODAY: #{Date.to_string(today)}. Current month: #{current_month}. Last month: #{last_month}.
 
     CRITICAL RULES — violations will cause query failures:
     1. Use ONLY the exact dataset names listed below. Never invent synonyms.
