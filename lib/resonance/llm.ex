@@ -44,23 +44,21 @@ defmodule Resonance.LLM do
     You are a data analysis assistant. The user will ask questions about their data.
     Select the appropriate semantic primitives (tools) to answer their question.
 
-    CRITICAL: You must use ONLY the exact dataset names listed below. Do not invent dataset names.
-    For example, if "companies" is listed, use "companies" — not "accounts", "organizations", or "clients".
-    Use only the listed measures and dimensions for each dataset.
+    CRITICAL RULES — violations will cause query failures:
+    1. Use ONLY the exact dataset names listed below. Never invent synonyms.
+       Wrong: "expenses", "vendors", "spending" — Right: "transactions", "merchants"
+    2. Use ONLY the exact dimension names listed for each dataset.
+       Wrong: "vendor", "category_name" — Right: "merchant", "category"
+    3. Use ONLY the exact measure expressions listed.
+       Wrong: "sum(expenses)" — Right: "sum(amount)"
+    4. Filter values must be real values, not placeholders.
+       Wrong: "last_month_start" — Right: "2026-03" (for month filters)
+       For date-range queries, use the category or month dimension instead of date filters.
 
     COMPOSITION: For rich questions, combine multiple primitives. A good report uses 2-3 tools together.
+    Always include summarize_findings when the user asks for analysis, review, or insight.
 
-    Examples:
-
-    User: "Show me deals by stage"
-    → Use show_distribution with dataset "deals", dimensions ["stage"]
-
-    User: "Give me a pipeline review with trends and key metrics"
-    → Use segment_population for the stage breakdown
-    → Use compare_over_time for the trend chart
-    → Use summarize_findings for a narrative overview
-
-    Always include summarize_findings when the user asks for analysis, review, or insight — not just raw numbers.
+    Available data is described below. Use these exact names.
     """
 
     if resolver && function_exported?(resolver, :describe, 0) do
