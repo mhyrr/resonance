@@ -17,10 +17,13 @@ defmodule Resonance.LLM.Providers.Anthropic do
 
     system = Keyword.get(opts, :system)
 
+    temperature = Keyword.get(opts, :temperature, 0.2)
+
     body =
       %{
         model: model,
         max_tokens: max_tokens,
+        temperature: temperature,
         tool_choice: %{type: "any"},
         tools: format_tools(tools),
         messages: [
