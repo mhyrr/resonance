@@ -319,7 +319,6 @@ defmodule FinanceDemo.Finance.Resolver do
         where(q, [t], t.merchant == ^v)
 
       %{field: "category", op: "=", value: v}, q ->
-        # Subquery avoids conflicting with dimension joins on categories
         cat_ids =
           from(c in Category,
             left_join: p in Category,
@@ -329,6 +328,15 @@ defmodule FinanceDemo.Finance.Resolver do
           )
 
         where(q, [t], t.category_id in subquery(cat_ids))
+
+      %{field: "month", op: "=", value: v}, q ->
+        where(q, [t], fragment("strftime('%Y-%m', ?)", t.date) == ^v)
+
+      %{field: "month", op: ">=", value: v}, q ->
+        where(q, [t], fragment("strftime('%Y-%m', ?)", t.date) >= ^v)
+
+      %{field: "month", op: "<=", value: v}, q ->
+        where(q, [t], fragment("strftime('%Y-%m', ?)", t.date) <= ^v)
 
       filter, q ->
         log_unsupported_filter("transactions", filter)
