@@ -418,11 +418,83 @@ LiveView eliminates most of that. The LLM's tool call output, the data resolutio
 
 OTP adds the structural pieces that a generative system needs. Each primitive resolves inside a supervised task; if one fails, the others still render. The composition engine uses `Task.async_stream` with backpressure and timeouts. These are properties of the runtime, not features bolted onto a web framework.
 
+## Interactive widgets (v2 preview)
+
+v0.1 is read-only generated reports. v0.2 adds a small contract on top of LiveView so the same composed report can be **interactive** without leaving the semantic layer.
+
+The unlock: a Presenter can return a **`Resonance.Widget`** — a Phoenix LiveComponent that implements one extra behaviour — instead of a function component. The widget receives the full `Renderable` (including the resolved `Result` and the original `QueryIntent`) and can re-resolve itself with a tweaked intent by calling `Resonance.refine/3`. No LLM round-trip, same trust boundary.
+
+```elixir
+defmodule MyApp.Widgets.FilterableLeaderboard do
+  use Resonance.Widget   # gives you LiveComponent + the behaviour
+
+  @impl Resonance.Widget
+  def accepts_results, do: [:ranking]
+
+  @impl Resonance.Widget
+  def capabilities, do: [:refine]
+
+  @impl Resonance.Widget
+  def example_renderable, do: # synthetic Renderable for the playground
+
+  @impl Phoenix.LiveComponent
+  def update(%{renderable: r} = assigns, socket) do
+    {:ok, socket |> assign(:renderable, r) |> assign(:resolver, assigns.resolver)}
+  end
+
+  def handle_event("filter_stage", %{"stage" => stage}, socket) do
+    {:ok, refined} =
+      Resonance.refine(
+        socket.assigns.renderable,
+        fn intent ->
+          %{intent | filters: [%{field: "stage", op: "=", value: stage}]}
+        end,
+        %{resolver: socket.assigns.resolver}
+      )
+
+    {:noreply, assign(socket, :renderable, refined)}
+  end
+
+  def render(assigns), do: ~H"..."
+end
+```
+
+In your Presenter, return `Renderable.ready_live/3` instead of `ready/3` for kinds you want interactive:
+
+```elixir
+def present(%Result{kind: :ranking, intent: %{dataset: "deals"}} = result, _ctx) do
+  Renderable.ready_live("rank_entities", FilterableLeaderboard, %{
+    title: result.title, data: result.data
+  })
+end
+```
+
+`Live.Report` notices the `render_via: :live` flag and dispatches to `<.live_component>` instead of the function component. Streaming updates route through `Phoenix.LiveView.send_update/2`. Everything else — your Resolver, your QueryIntent, the LLM tool flow — is unchanged.
+
+### The widget contract
+
+- **Required:** `accepts_results/0` returns the list of `Result` kinds the widget can render.
+- **Optional:** `capabilities/0` declares which user gestures the widget supports (`:refine`, `:mutate`, `:drilldown`).
+- **Optional:** `example_renderable/0` returns a synthetic Renderable for the playground.
+- **From `LiveComponent`:** `update/2` accepts a `:renderable` assign carrying the full `%Renderable{}`.
+
+### Playground
+
+Mount `Resonance.Live.Playground` in your router to get a developer page that enumerates every loaded widget, shows its declared metadata, and renders each one against its `example_renderable/0`:
+
+```elixir
+# router.ex
+scope "/" do
+  pipe_through :browser
+  live "/resonance/playground", Resonance.Live.Playground
+end
+```
+
+Don't expose this on a public route — it's a developer surface.
+
 ## Where This Goes
 
-v0.1 is read-only: generated views of existing data. But the architecture is designed for what comes after.
-
-The structured `QueryIntent` is already a validated, inspectable intermediate representation — a bounded AST with explicit datasets, measures, dimensions, and filters. The resolver is already a trust boundary with permission enforcement. The primitive system is already extensible at runtime. The presenter layer is already swappable. All of these extend naturally to write operations, interactive filters, saved views, and eventually full user-driven application surfaces.
+The structured `QueryIntent` is already a validated, inspectable intermediate representation — a bounded AST with explicit datasets, measures, dimensions, and filters. The resolver is already a trust boundary with permission enforcement. The primitive system is already extensible at runtime. The presenter layer is already swappable. All of these extend naturally to write operations, saved views, and eventually full user-driven application surfaces — the v2 widget contract is the first step.
 
 ## Why "Resonance"?
 

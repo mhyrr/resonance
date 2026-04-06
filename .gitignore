@@ -41,3 +41,6 @@ example/finance_demo/*.db-*
 
 # Playwright MCP
 .playwright-mcp/
+
+# Ad-hoc verification screenshots
+/*.png

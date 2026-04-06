@@ -98,6 +98,7 @@ defmodule ResonanceDemoWeb.ExploreLive do
         module={Resonance.Live.Report}
         id="explore-report"
         resolver={ResonanceDemo.CRM.Resolver}
+        presenter={ResonanceDemoWeb.Presenters.Interactive}
       />
 
       <div class="mt-12 text-center text-gray-400">

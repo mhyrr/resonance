@@ -60,9 +60,11 @@ defmodule Resonance.Live.Report do
   end
 
   # Handle streaming: individual component arrivals.
-  # If a renderable with the same ID exists, replace it in-place and
-  # push new data to the chart hook via event (bypasses phx-update="ignore").
-  # Otherwise append (initial generation).
+  # If a renderable with the same ID exists, replace it in-place and route the
+  # update to the right place (chart hook for function-component charts,
+  # send_update/2 for LiveComponent widgets). Otherwise append (initial
+  # generation — first render of a :live renderable will mount the
+  # LiveComponent which receives the renderable via its update/2 callback).
   defp handle_streaming_component(socket, %{resonance_component: %Renderable{} = renderable}) do
     existing = socket.assigns.components
 
@@ -74,13 +76,25 @@ defmodule Resonance.Live.Report do
 
       socket
       |> assign(:components, updated)
-      |> push_chart_update(renderable)
+      |> route_renderable_update(renderable)
     else
       assign(socket, :components, existing ++ [renderable])
     end
   end
 
   defp handle_streaming_component(socket, _assigns), do: socket
+
+  defp route_renderable_update(
+         socket,
+         %Renderable{render_via: :live, component: module, id: id} = renderable
+       ) do
+    Phoenix.LiveView.send_update(module, id: id, renderable: renderable)
+    socket
+  end
+
+  defp route_renderable_update(socket, %Renderable{render_via: :function} = renderable) do
+    push_chart_update(socket, renderable)
+  end
 
   # Handle streaming: store tool calls for refresh.
   defp handle_tool_calls(socket, %{resonance_tool_calls: calls}) when is_list(calls) do
@@ -296,7 +310,18 @@ defmodule Resonance.Live.Report do
       <div :if={@components != []} class="resonance-components">
         <%= for component <- Layout.order(@components) do %>
           <div class="resonance-component-wrapper">
-            {render_component(component)}
+            <%= if component.render_via == :live and component.status == :ready do %>
+              <.live_component
+                module={component.component}
+                id={component.id}
+                renderable={component}
+                resolver={@resolver}
+                current_user={@current_user}
+                presenter={@presenter}
+              />
+            <% else %>
+              {render_component(component)}
+            <% end %>
           </div>
         <% end %>
       </div>

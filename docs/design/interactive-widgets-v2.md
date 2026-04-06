@@ -37,29 +37,70 @@ If you only ever write read-only reports, nothing changes. v2 is purely additive
 
 ## What's new (four things)
 
-### 1. A widget is a LiveComponent that receives a Renderable
+### 1. `Resonance.Widget` — a behaviour on top of LiveComponent
 
-That's the entire contract. No new behaviour, no `use Resonance.Widget`, no
-capability tags. A widget is any Phoenix LiveComponent whose `update/2` accepts
-an assign called `:renderable` (carrying the full `%Renderable{}`, which already
-includes the `Result`, the `QueryIntent`, and a stable id).
+A widget is a Phoenix LiveComponent that implements the `Resonance.Widget`
+behaviour. The behaviour is symmetric to `Resonance.Component` (which already
+exists for the read-only path):
 
-Developers write widgets the way they write any other LiveComponent. They call
-their own contexts from `handle_event/3`. They manage local state in socket
-assigns. Resonance has nothing to teach them.
+```elixir
+defmodule MyApp.Widgets.FilterableLeaderboard do
+  use Resonance.Widget   # gives you LiveComponent + the behaviour
+
+  @impl true
+  def accepts_results, do: [:ranked_list]
+
+  @impl true
+  def capabilities, do: [:refine]
+
+  @impl true
+  def example_renderable, do: # synthetic Renderable for the playground
+
+  @impl Phoenix.LiveComponent
+  def update(%{renderable: r} = assigns, socket), do: # standard LiveComponent
+  def handle_event("filter", %{...}, socket), do: # standard LiveComponent
+  def render(assigns), do: ~H"..."
+end
+```
+
+The contract:
+
+- **Required:** `accepts_results/0 :: [Result.kind()]` — which Result kinds this
+  widget can render. Used by the Presenter dispatch table and the playground.
+- **Optional:** `capabilities/0 :: [:refine | :mutate | :drilldown]` — declares
+  what user gestures the widget supports. Default `[]`. (In v2 this is
+  documentation; in v2.1 it can feed into the LLM's system prompt to bias toward
+  explorable reports.)
+- **Optional:** `example_renderable/0 :: Renderable.t()` — a synthetic
+  Renderable used by the playground to render the widget without real data.
+- **Required by LiveComponent (already):** `update/2` accepts a `:renderable`
+  assign carrying the full `%Renderable{}` (which already includes the `Result`,
+  the `QueryIntent`, and a stable id). The widget reads from it and may call
+  `Resonance.refine/2` to produce a new one.
+
+`use Resonance.Widget` is one line that pulls in `Phoenix.LiveComponent` and
+declares `@behaviour Resonance.Widget`. Developers write widgets the way they
+write any other LiveComponent — call their own contexts from `handle_event/3`,
+manage local state in socket assigns. Resonance teaches one extra thing: "tell
+us what Result kinds you accept."
 
 The Presenter, instead of always returning a function-component module, may now
-return a LiveComponent module. The `Renderable` gains one field —
+return a Widget module. The `Renderable` gains one field —
 `render_via: :function | :live` — which the Presenter sets when it builds the
 Renderable. That's the only struct change.
 
-**Why this is enough for v2:** the things that previously argued for a behaviour
-(discoverability, capability tags, uniformity) are real concerns, but they're
-concerns for a *catalog* of widgets shared across apps. v2 doesn't need that.
-Each app has one Presenter and writes the dispatch table once, exactly the way
-it writes the read-only Presenter today. The contract uniformity comes from the
-convention "your widget takes a `:renderable` assign," documented in one
-paragraph.
+**Why a behaviour, not just a convention:** an earlier draft of this doc
+proposed no behaviour, on YAGNI grounds — "the Presenter dispatch table is the
+catalog." That was wrong, for three reasons:
+
+1. The library's identity is contracts. Primitive, Resolver, Presenter, Result,
+   QueryIntent, and now Component are all behaviours. A widget that's "a
+   LiveComponent with a magic assign name" is the only anomaly.
+2. The playground needs widget enumeration and per-widget metadata. Without a
+   behaviour, the playground reinvents one internally.
+3. Declared capabilities are exactly the structured developer-side context the
+   LLM needs to bias toward explorability. Building it in v2 is nearly free and
+   unblocks v2.1.
 
 ### 2. `Live.Report` renders both kinds and routes updates to the right place
 
@@ -126,8 +167,6 @@ Naming these because a previous round of design had us inventing solutions for
 them, and v2 is better off without those solutions until a real app forces the
 issue.
 
-- **No `Resonance.Widget` behaviour.** No capability tags, no `accepts/0`, no
-  `WidgetCatalog`. The Presenter's dispatch table is the catalog.
 - **No `Resonance.Scope` struct.** Widgets that need context get it the way
   every LiveComponent gets it: as assigns from the parent. `Live.Report` already
   threads `:resolver`, `:current_user`, etc.; widgets receive what they need
@@ -165,9 +204,9 @@ an actual app fails without them, not before.
 | **5. LiveView surface** | Renders function components, streams updates via `push_event` for charts. | Renders both kinds. Streams updates to LiveComponents via `send_update`. Function-component path unchanged. |
 
 The cleanliness of the original five-layer model is preserved. v2 adds **one
-struct field** (`render_via`), **one function** (`refine/2`), and **one
-render-loop branch**. Everything else is "developers write LiveComponents, like
-they always have."
+behaviour** (`Resonance.Widget`), **one struct field** (`render_via`), **one
+function** (`refine/2`), and **one render-loop branch**. Everything else is
+"developers write LiveComponents, like they always have."
 
 ## What you can build with this
 
@@ -210,17 +249,24 @@ says "your widget is a LiveComponent that takes a `:renderable` assign."
 
 ## v2 build order
 
-1. Add `render_via` to `%Renderable{}`. Default `:function`. No behavior change
+1. Add `Resonance.Widget` behaviour. One required callback (`accepts_results/0`),
+   two optional (`capabilities/0`, `example_renderable/0`). `use Resonance.Widget`
+   pulls in `Phoenix.LiveComponent` and the behaviour.
+2. Add `render_via` to `%Renderable{}`. Default `:function`. No behaviour change
    for existing code.
-2. Refactor `Live.Report.render/1` to branch on `render_via` in the template.
+3. Refactor `Live.Report.render/1` to branch on `render_via` in the template.
    Verify the read-only test suite still passes.
-3. Implement `Resonance.refine/2` as a thin wrapper over `Composer.resolve_one`.
-4. Build one real interactive widget in `example/resonance_demo`: a filterable
+4. Implement `Resonance.refine/2` as a thin wrapper over `Composer.resolve_one`.
+5. Build the playground LiveView. Enumerates Widget-implementing modules,
+   renders each against `example_renderable/0`, displays declared capabilities.
+   Mounted at `/resonance/playground` in the CRM demo. This is the v2 demo
+   surface.
+6. Build one real interactive widget in `example/resonance_demo`: a filterable
    deals leaderboard. Use only `refine/2` and `send_update`. If something feels
    missing while building it, *that's* the v2 gap — fix it then, not now.
-5. Document the convention: "a Resonance widget is a LiveComponent whose
-   `update/2` accepts a `:renderable` assign. Call `Resonance.refine/2` to
-   re-resolve it. Call your own contexts from `handle_event/3`."
+7. Document the convention: "a Resonance widget is a `use Resonance.Widget`
+   LiveComponent. Implement `accepts_results/0`. Call `Resonance.refine/2` to
+   re-resolve. Call your own contexts from `handle_event/3`."
 
 The discipline for v2 is: nothing goes in the library that the example app
 doesn't need. Every additional concept earns its place by failing without it.

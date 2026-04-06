@@ -22,9 +22,21 @@ defmodule Resonance do
 
   The LLM selects semantic operations. Your app resolves truth.
   Resonance composes the UI.
+
+  ## Interactive widgets (v2)
+
+  Read-only reports use `Resonance.Component` (function components). For
+  interactive surfaces, return a `Resonance.Widget` from your Presenter
+  instead — a Phoenix LiveComponent with one extra behaviour. Widgets
+  receive the full `Renderable` (including the resolved `Result` and the
+  original `QueryIntent`) and call `Resonance.refine/3` to re-resolve with
+  a tweaked intent — no LLM round-trip, same trust boundary.
+
+  See `Resonance.Widget` for the full contract and `Resonance.Live.Playground`
+  for a developer page that enumerates every loaded widget.
   """
 
-  alias Resonance.{Composer, LLM, Registry}
+  alias Resonance.{Composer, LLM, Primitive, Registry, Renderable, Result}
 
   @doc """
   Generate a composed report from a natural language prompt.
@@ -67,5 +79,86 @@ defmodule Resonance do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  @doc """
+  Re-resolve an existing Renderable with a tweaked `QueryIntent`.
+
+  Used by interactive widgets (`Resonance.Widget`) to react to user gestures —
+  filter changes, drilldowns, etc. — without going back through the LLM.
+
+  Takes the current Renderable and a function that mutates the Renderable's
+  `QueryIntent` (passing a function instead of a new intent forces the widget
+  to start from the existing intent, preserving the LLM's original constraints
+  and making refinement composable).
+
+  ## Trust boundary
+
+  `refine/3` calls the resolver's existing `validate/2` callback before
+  resolving — the same trust boundary the read-only path uses. If a developer
+  needs stricter rules for user-driven refinements than for LLM-generated ones,
+  they can branch on a flag in `context`.
+
+  ## Example
+
+      def handle_event("filter", %{"stage" => stage}, socket) do
+        context = %{
+          resolver: socket.assigns.resolver,
+          current_user: socket.assigns[:current_user],
+          presenter: socket.assigns[:presenter]
+        }
+
+        {:ok, refined} =
+          Resonance.refine(socket.assigns.renderable, fn intent ->
+            update_in(intent.filters, fn filters ->
+              [%{field: "stage", op: "=", value: stage} | filters || []]
+            end)
+          end, context)
+
+        {:noreply, assign(socket, :renderable, refined)}
+      end
+
+  Returns `{:ok, new_renderable}` on success or `{:error, reason}` if the
+  mutated intent fails validation or the resolver returns an error. The new
+  Renderable preserves the original `id` so the LiveComponent rerenders in
+  place rather than remounting.
+  """
+  @spec refine(Renderable.t(), (Resonance.QueryIntent.t() -> Resonance.QueryIntent.t()), map()) ::
+          {:ok, Renderable.t()} | {:error, term()}
+  def refine(renderable, intent_fn, context \\ %{})
+
+  def refine(
+        %Renderable{result: %Result{intent: intent} = result, primitive: primitive_name} =
+          renderable,
+        intent_fn,
+        context
+      )
+      when is_function(intent_fn, 1) and is_binary(primitive_name) do
+    new_intent = intent_fn.(intent)
+
+    case Primitive.resolve_with_intent(result.kind, new_intent, result.title, context) do
+      {:ok, %Result{} = new_result} ->
+        presenter = context[:presenter] || Resonance.Presenters.Default
+        new_renderable = presenter.present(new_result, context)
+
+        {:ok,
+         %{
+           new_renderable
+           | id: renderable.id,
+             result: new_result,
+             primitive: primitive_name
+         }}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def refine(%Renderable{result: nil}, _intent_fn, _context) do
+    {:error, :renderable_missing_result}
+  end
+
+  def refine(%Renderable{primitive: nil}, _intent_fn, _context) do
+    {:error, :renderable_missing_primitive}
   end
 end

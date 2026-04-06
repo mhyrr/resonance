@@ -91,7 +91,9 @@ defmodule Resonance.Composer do
                 )
 
                 presenter = context[:presenter] || Resonance.Presenters.Default
-                presenter.present(result, context)
+                renderable = presenter.present(result, context)
+                # Stamp source metadata so refine/2 can re-resolve later.
+                %{renderable | result: result, primitive: name}
 
               {:error, reason} ->
                 Logger.warning(

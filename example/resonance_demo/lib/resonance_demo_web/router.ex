@@ -21,6 +21,14 @@ defmodule ResonanceDemoWeb.Router do
     live "/explore", ExploreLive
   end
 
+  scope "/" do
+    pipe_through :browser
+
+    live_session :playground, on_mount: ResonanceDemoWeb.PlaygroundContext do
+      live "/resonance/playground", Resonance.Live.Playground
+    end
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", ResonanceDemoWeb do
   #   pipe_through :api
