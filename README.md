@@ -4,6 +4,10 @@
 
 An Elixir library that lets users ask questions about application data and receive composed, app-native UI (reports, dashboards, contextual insights) built from semantic primitives and streamed in real-time via LiveView.
 
+> **Guiding line:** *Resonance lets the user's question pick from the developer's design system.*
+>
+> The LLM doesn't invent UI. The developer brings the look, the components, and the data; Resonance is the runtime that lets a user's natural-language question compose those into a view, at query time, live.
+
 ## How It Works
 
 ```
@@ -418,11 +422,112 @@ LiveView eliminates most of that. The LLM's tool call output, the data resolutio
 
 OTP adds the structural pieces that a generative system needs. Each primitive resolves inside a supervised task; if one fails, the others still render. The composition engine uses `Task.async_stream` with backpressure and timeouts. These are properties of the runtime, not features bolted onto a web framework.
 
+## Interactive widgets (v2)
+
+v0.1 is read-only generated reports. v0.2 adds a small contract on top of LiveView so the same composed report can be **interactive**.
+
+**The principle:** Resonance composes the page from the user's question; once the widget is mounted, *Resonance is gone from the runtime path.* Widgets are real Phoenix LiveComponents — they call your app contexts from `handle_event/3`, manage local state in assigns, and handle mutations the same way every other LiveComponent does. The library composes; Phoenix runs.
+
+A presenter can return a **`Resonance.Widget`** — a Phoenix LiveComponent that implements one extra behaviour — instead of a function component:
+
+```elixir
+defmodule MyApp.Widgets.FilterableLeaderboard do
+  use Resonance.Widget   # gives you LiveComponent + the behaviour
+
+  alias MyApp.Deals
+
+  @impl Resonance.Widget
+  def accepts_results, do: [:ranking]
+
+  @impl Resonance.Widget
+  def capabilities, do: [:filter, :live_updates]
+
+  @impl Resonance.Widget
+  def example_renderable, do: # synthetic Renderable for the playground
+
+  # ===== From here down it's a normal Phoenix LiveComponent =====
+
+  @impl Phoenix.LiveComponent
+  def update(%{renderable: r} = assigns, socket) do
+    {:ok,
+     socket
+     |> assign(:title, r.props.title)
+     |> assign(:rows, r.props.rows)
+     |> assign(:active_stage, r.props[:active_stage])
+     |> assign(:current_user, assigns[:current_user])}
+  end
+
+  @impl Phoenix.LiveComponent
+  def handle_event("filter_stage", %{"stage" => stage}, socket) do
+    # Call your own context directly. No Resonance machinery on this path.
+    rows = Deals.top_by_value(stage: stage, user: socket.assigns.current_user)
+    {:noreply, socket |> assign(:active_stage, stage) |> assign(:rows, rows)}
+  end
+
+  def render(assigns), do: ~H"..."
+end
+```
+
+In your Presenter, return `Renderable.ready_live/3` instead of `ready/3` for kinds you want interactive. The presenter is also where you unpack the LLM-resolved `Result.intent` into clean widget props:
+
+```elixir
+def present(%Result{kind: :ranking, intent: %{dataset: "deals"} = intent} = result, _ctx) do
+  Renderable.ready_live("rank_entities", FilterableLeaderboard, %{
+    title: result.title,
+    rows: result.data,
+    active_stage: stage_filter_value(intent.filters)  # presenter unpacks the intent
+  })
+end
+```
+
+`Live.Report` notices `render_via: :live` and dispatches to `<.live_component>` instead of the function component, threading any `widget_assigns` map you pass through:
+
+```elixir
+<.live_component
+  module={Resonance.Live.Report}
+  id="explore"
+  resolver={MyApp.Resolver}
+  presenter={MyApp.Presenter}
+  widget_assigns={%{current_user: @current_user}}
+/>
+```
+
+Everything else — your Resolver, the LLM tool flow, the function component path for read-only charts — is unchanged.
+
+### Live updates from data changes
+
+Because widgets are real LiveComponents, you handle live updates the way Phoenix already does it: subscribe to a `Phoenix.PubSub` topic in the *parent LiveView*, and on receiving a message call `Phoenix.LiveView.send_update/2` to push a refreshed `:renderable` (or fresh assigns) into the widget. LiveComponents share their parent process and can't subscribe directly — but the parent owning the subscription is the standard pattern.
+
+### The widget contract
+
+- **Required:** `accepts_results/0` returns the list of `Result` kinds the widget can render.
+- **Optional:** `capabilities/0` declares which user gestures the widget supports (developer documentation, shown in the playground).
+- **Optional:** `example_renderable/0` returns a synthetic Renderable the playground draws.
+- **Optional:** `playground_renderable/1` returns a Renderable built from real data (called by the playground when an `on_mount` hook provides `widget_assigns`).
+- **From `LiveComponent`:** `update/2` accepts a `:renderable` assign. The widget reads `:props` for initial state. Everything else is normal LiveComponent.
+
+### Playground
+
+Mount `Resonance.Live.Playground` in your router to get a developer page that enumerates every loaded widget, shows its declared metadata, and renders each one against either its `example_renderable/0` (synthetic data) or its `playground_renderable/1` (real data, if you wire an `on_mount` hook):
+
+```elixir
+# router.ex (static, synthetic data only)
+scope "/" do
+  pipe_through :browser
+  live "/resonance/playground", Resonance.Live.Playground
+end
+
+# router.ex (live data — playground talks to your real contexts)
+live_session :playground, on_mount: MyAppWeb.PlaygroundContext do
+  live "/resonance/playground", Resonance.Live.Playground
+end
+```
+
+The on_mount hook drops `:widget_assigns`, optionally a `:simulate_fn` for a "regenerate sample data" button, and `:pubsub` + `:subscribe_topics` for auto-refresh-on-broadcast. Don't expose the playground on a public route — it's a developer surface.
+
 ## Where This Goes
 
-v0.1 is read-only: generated views of existing data. But the architecture is designed for what comes after.
-
-The structured `QueryIntent` is already a validated, inspectable intermediate representation — a bounded AST with explicit datasets, measures, dimensions, and filters. The resolver is already a trust boundary with permission enforcement. The primitive system is already extensible at runtime. The presenter layer is already swappable. All of these extend naturally to write operations, interactive filters, saved views, and eventually full user-driven application surfaces.
+The structured `QueryIntent` is a validated, inspectable intermediate representation — a bounded AST with explicit datasets, measures, dimensions, and filters. The resolver is already a trust boundary with permission enforcement. The primitive system is extensible at runtime. The presenter layer is swappable. The widget contract bridges into the full Phoenix LiveComponent ecosystem with one extra callback. The vision: a Phoenix developer uses Resonance to generate on-the-fly real-time pages, fully interactive, with the look and feel and contracts defined entirely by their app. Resonance composes the question into a starting page; Phoenix runs everything from there.
 
 ## Why "Resonance"?
 

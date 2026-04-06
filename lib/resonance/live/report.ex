@@ -18,7 +18,7 @@ defmodule Resonance.Live.Report do
   use Phoenix.LiveComponent
 
   require Logger
-  alias Resonance.{Composer, Layout, LLM, Registry, Renderable}
+  alias Resonance.{Layout, Pipeline, Renderable}
 
   @impl true
   def mount(socket) do
@@ -53,6 +53,7 @@ defmodule Resonance.Live.Report do
     |> assign_new(:resolver, fn -> assigns[:resolver] end)
     |> assign_new(:current_user, fn -> assigns[:current_user] end)
     |> assign_new(:presenter, fn -> assigns[:presenter] end)
+    |> assign_new(:widget_assigns, fn -> assigns[:widget_assigns] || %{} end)
     |> assign_new(:components, fn -> [] end)
     |> assign_new(:loading, fn -> false end)
     |> assign_new(:prompt, fn -> "" end)
@@ -60,9 +61,11 @@ defmodule Resonance.Live.Report do
   end
 
   # Handle streaming: individual component arrivals.
-  # If a renderable with the same ID exists, replace it in-place and
-  # push new data to the chart hook via event (bypasses phx-update="ignore").
-  # Otherwise append (initial generation).
+  # If a renderable with the same ID exists, replace it in-place and route the
+  # update to the right place (chart hook for function-component charts,
+  # send_update/2 for LiveComponent widgets). Otherwise append (initial
+  # generation — first render of a :live renderable will mount the
+  # LiveComponent which receives the renderable via its update/2 callback).
   defp handle_streaming_component(socket, %{resonance_component: %Renderable{} = renderable}) do
     existing = socket.assigns.components
 
@@ -74,13 +77,25 @@ defmodule Resonance.Live.Report do
 
       socket
       |> assign(:components, updated)
-      |> push_chart_update(renderable)
+      |> route_renderable_update(renderable)
     else
       assign(socket, :components, existing ++ [renderable])
     end
   end
 
   defp handle_streaming_component(socket, _assigns), do: socket
+
+  defp route_renderable_update(
+         socket,
+         %Renderable{render_via: :live, component: module, id: id} = renderable
+       ) do
+    Phoenix.LiveView.send_update(module, id: id, renderable: renderable)
+    socket
+  end
+
+  defp route_renderable_update(socket, %Renderable{render_via: :function} = renderable) do
+    push_chart_update(socket, renderable)
+  end
 
   # Handle streaming: store tool calls for refresh.
   defp handle_tool_calls(socket, %{resonance_tool_calls: calls}) when is_list(calls) do
@@ -128,7 +143,7 @@ defmodule Resonance.Live.Report do
 
   defp handle_refresh(socket, _assigns), do: socket
 
-  # Allow resolver and presenter to be updated from parent assigns.
+  # Allow resolver, presenter, and widget_assigns to be updated from parent.
   defp handle_assign_updates(socket, assigns) do
     socket
     |> then(fn s ->
@@ -136,6 +151,9 @@ defmodule Resonance.Live.Report do
     end)
     |> then(fn s ->
       if assigns[:presenter], do: assign(s, :presenter, assigns.presenter), else: s
+    end)
+    |> then(fn s ->
+      if assigns[:widget_assigns], do: assign(s, :widget_assigns, assigns.widget_assigns), else: s
     end)
   end
 
@@ -152,114 +170,43 @@ defmodule Resonance.Live.Report do
   end
 
   defp start_generation(socket, prompt) do
-    socket = assign(socket, loading: true, components: [], prompt: prompt, error: nil)
-
-    context = %{
-      resolver: socket.assigns.resolver,
-      current_user: socket.assigns[:current_user],
-      presenter: socket.assigns[:presenter]
-    }
-
-    component_id = socket.assigns.id
-    lv_pid = self()
-
-    Task.Supervisor.start_child(Resonance.TaskSupervisor, fn ->
-      try do
-        case LLM.chat(prompt, Registry.all_schemas(), context) do
-          {:ok, tool_calls} ->
-            Logger.info(
-              "[Resonance] LLM returned #{length(tool_calls)} tool call(s): #{Enum.map_join(tool_calls, ", ", & &1.name)}"
-            )
-
-            send_update(lv_pid, __MODULE__,
-              id: component_id,
-              resonance_tool_calls: tool_calls
-            )
-
-            resolve_and_stream(tool_calls, context, lv_pid, component_id)
-
-          {:error, reason} ->
-            Logger.error("[Resonance] LLM call failed: #{inspect(reason)}")
-
-            send_update(lv_pid, __MODULE__,
-              id: component_id,
-              resonance_result: {:error, reason}
-            )
-        end
-      rescue
-        e ->
-          send_update(lv_pid, __MODULE__,
-            id: component_id,
-            resonance_result: {:error, {:internal_error, Exception.message(e)}}
-          )
-      catch
-        :exit, reason ->
-          send_update(lv_pid, __MODULE__,
-            id: component_id,
-            resonance_result: {:error, {:task_exit, inspect(reason)}}
-          )
-      end
-    end)
-
-    socket
+    Pipeline.run(prompt, build_context(socket), report_sink(socket))
+    assign(socket, loading: true, components: [], prompt: prompt, error: nil)
   end
 
   defp refresh_data(socket) do
-    socket = assign(socket, loading: true, error: nil)
+    Pipeline.resolve(socket.assigns.tool_calls, build_context(socket), report_sink(socket))
+    assign(socket, loading: true, error: nil)
+  end
 
-    context = %{
+  defp build_context(socket) do
+    %{
       resolver: socket.assigns.resolver,
       current_user: socket.assigns[:current_user],
       presenter: socket.assigns[:presenter]
     }
-
-    tool_calls = socket.assigns.tool_calls
-    component_id = socket.assigns.id
-    lv_pid = self()
-
-    Task.Supervisor.start_child(Resonance.TaskSupervisor, fn ->
-      try do
-        resolve_and_stream(tool_calls, context, lv_pid, component_id)
-      rescue
-        e ->
-          send_update(lv_pid, __MODULE__,
-            id: component_id,
-            resonance_result: {:error, {:internal_error, Exception.message(e)}}
-          )
-      end
-    end)
-
-    socket
   end
 
-  defp resolve_and_stream(tool_calls, context, lv_pid, component_id) do
-    tool_calls
-    |> Enum.with_index()
-    |> Task.async_stream(
-      fn {call, idx} ->
-        renderable = Composer.resolve_one(call, context)
-        # Deterministic ID: same tool calls always produce same DOM IDs
-        stable_id = "#{call.name}-#{idx}"
-        %{renderable | id: stable_id}
-      end,
-      timeout: 30_000,
-      on_timeout: :kill_task
-    )
-    |> Enum.each(fn
-      {:ok, renderable} ->
-        send_update(lv_pid, __MODULE__,
-          id: component_id,
-          resonance_component: renderable
-        )
+  # Sink closure bound to this component's id and PID. Pipeline events
+  # get translated to send_update calls that flow back into update/2 via
+  # handle_streaming_component, handle_tool_calls, handle_done, handle_error.
+  defp report_sink(socket) do
+    lv_pid = self()
+    component_id = socket.assigns.id
 
-      {:exit, :timeout} ->
-        send_update(lv_pid, __MODULE__,
-          id: component_id,
-          resonance_component: Renderable.error("unknown", :timeout)
-        )
-    end)
+    fn
+      {:tool_calls, calls} ->
+        send_update(lv_pid, __MODULE__, id: component_id, resonance_tool_calls: calls)
 
-    send_update(lv_pid, __MODULE__, id: component_id, resonance_done: true)
+      {:component_ready, renderable} ->
+        send_update(lv_pid, __MODULE__, id: component_id, resonance_component: renderable)
+
+      :done ->
+        send_update(lv_pid, __MODULE__, id: component_id, resonance_done: true)
+
+      {:error, reason} ->
+        send_update(lv_pid, __MODULE__, id: component_id, resonance_result: {:error, reason})
+    end
   end
 
   @impl true
@@ -296,7 +243,16 @@ defmodule Resonance.Live.Report do
       <div :if={@components != []} class="resonance-components">
         <%= for component <- Layout.order(@components) do %>
           <div class="resonance-component-wrapper">
-            {render_component(component)}
+            <%= if component.render_via == :live and component.status == :ready do %>
+              <.live_component
+                module={component.component}
+                id={component.id}
+                renderable={component}
+                {@widget_assigns}
+              />
+            <% else %>
+              {render_component(component)}
+            <% end %>
           </div>
         <% end %>
       </div>

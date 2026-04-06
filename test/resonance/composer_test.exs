@@ -83,24 +83,4 @@ defmodule Resonance.ComposerTest do
              Composer.compose(tool_calls, %{resolver: FailingResolver})
   end
 
-  test "compose_stream sends components and done message" do
-    tool_calls = [
-      %Resonance.LLM.ToolCall{
-        id: "call_1",
-        name: "compare_over_time",
-        arguments: %{
-          "dataset" => "deals",
-          "measures" => ["sum(value)"],
-          "dimensions" => ["quarter"],
-          "title" => "Streamed"
-        }
-      }
-    ]
-
-    context = %{resolver: MockResolver}
-    assert :ok = Composer.compose_stream(tool_calls, context, self())
-
-    assert_receive {:resonance, {:component_ready, %Renderable{status: :ready}}}, 5000
-    assert_receive {:resonance, :done}, 5000
-  end
 end

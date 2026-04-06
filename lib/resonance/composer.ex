@@ -1,9 +1,15 @@
 defmodule Resonance.Composer do
   @moduledoc """
-  Orchestrates tool calls into resolved, renderable components.
+  Resolves tool calls into renderable components.
 
-  Takes normalized tool calls from the LLM and dispatches each to its
-  registered primitive for data resolution and presentation mapping.
+  `resolve_one/2` is the core primitive: take a tool call, dispatch to
+  its registered primitive, produce a `Renderable`. `compose/2` runs a
+  batch of tool calls in parallel and returns the results.
+
+  The streaming / event-driven path — with stable IDs and sink-based
+  delivery — lives in `Resonance.Pipeline`, which is the canonical entry
+  point for both the public `Resonance.generate_stream/3` API and the
+  in-library `Resonance.Live.Report` surface.
   """
 
   require Logger
@@ -35,36 +41,6 @@ defmodule Resonance.Composer do
   end
 
   @doc """
-  Stream composed components to a process as they resolve.
-
-  Sends `{:resonance, {:component_ready, renderable}}` for each resolved
-  component and `{:resonance, :done}` when all are complete.
-  """
-  @spec compose_stream([Resonance.LLM.ToolCall.t()], map(), pid()) :: :ok
-  def compose_stream(tool_calls, context, pid) do
-    Task.Supervisor.start_child(Resonance.TaskSupervisor, fn ->
-      Task.Supervisor.async_stream_nolink(
-        Resonance.TaskSupervisor,
-        tool_calls,
-        fn call -> resolve_one(call, context) end,
-        timeout: 30_000,
-        on_timeout: :kill_task
-      )
-      |> Enum.each(fn
-        {:ok, renderable} ->
-          send(pid, {:resonance, {:component_ready, renderable}})
-
-        {:exit, :timeout} ->
-          send(pid, {:resonance, {:component_ready, Renderable.error("unknown", :timeout)}})
-      end)
-
-      send(pid, {:resonance, :done})
-    end)
-
-    :ok
-  end
-
-  @doc """
   Resolve a single tool call into a Renderable.
 
   Calls the primitive's `resolve/2` to get a `Result`, then passes
@@ -91,7 +67,11 @@ defmodule Resonance.Composer do
                 )
 
                 presenter = context[:presenter] || Resonance.Presenters.Default
-                presenter.present(result, context)
+                renderable = presenter.present(result, context)
+                # Stamp the source Result onto the Renderable as an
+                # introspection-only paper trail. Widgets must not read it
+                # at runtime — see Resonance.Renderable docs.
+                %{renderable | result: result}
 
               {:error, reason} ->
                 Logger.warning(

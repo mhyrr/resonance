@@ -2,9 +2,14 @@ defmodule Resonance do
   @moduledoc """
   Generative analysis surfaces for Phoenix LiveView.
 
-  Resonance lets users ask questions about application data and receive
-  composed, app-native UI — reports, dashboards, and contextual insights —
-  built from semantic primitives and streamed in real-time via LiveView.
+  **Resonance lets the user's question pick from the developer's design system.**
+
+  The LLM doesn't invent UI — the developer brings the look, the components,
+  and the data. Resonance is the runtime that lets a user's natural-language
+  question compose those into a view, at query time, live. Users ask
+  questions about application data and receive composed, app-native UI —
+  reports, dashboards, contextual insights — built from semantic primitives
+  and streamed in real-time via LiveView.
 
   ## Quick Start
 
@@ -22,9 +27,24 @@ defmodule Resonance do
 
   The LLM selects semantic operations. Your app resolves truth.
   Resonance composes the UI.
+
+  ## Interactive widgets (v2)
+
+  Read-only reports use `Resonance.Component` (function components). For
+  interactive surfaces, return a `Resonance.Widget` from your Presenter —
+  a Phoenix LiveComponent with one extra behaviour (`accepts_results/0`).
+
+  Resonance composes the page from the user's question; once the widget is
+  mounted, Resonance is gone from the runtime path. Widgets are real
+  LiveComponents: they call your app contexts from `handle_event/3`, subscribe
+  to PubSub for live updates, and handle mutations the way every other Phoenix
+  LiveComponent does. The library composes; Phoenix runs.
+
+  See `Resonance.Widget` for the full contract and `Resonance.Live.Playground`
+  for a developer page that enumerates every loaded widget.
   """
 
-  alias Resonance.{Composer, LLM, Registry}
+  alias Resonance.{Composer, LLM, Pipeline, Registry}
 
   @doc """
   Generate a composed report from a natural language prompt.
@@ -56,16 +76,20 @@ defmodule Resonance do
   Stream composed report components to a process as they resolve.
 
   Sends `{:resonance, {:component_ready, renderable}}` messages to `pid`
-  as each component finishes resolving. Sends `{:resonance, :done}` when complete.
-  """
-  @spec generate_stream(String.t(), map(), pid()) :: :ok | {:error, term()}
-  def generate_stream(prompt, context, pid) do
-    case LLM.chat(prompt, Registry.all_schemas(), context) do
-      {:ok, tool_calls} ->
-        Composer.compose_stream(tool_calls, context, pid)
+  as each component finishes resolving. Sends `{:resonance, :done}` when
+  complete. Sends `{:resonance, {:error, reason}}` if the LLM call fails
+  or the pipeline crashes.
 
-      {:error, reason} ->
-        {:error, reason}
-    end
+  This is a thin wrapper over `Resonance.Pipeline.run/3` — the same
+  canonical pipeline that powers `Resonance.Live.Report`.
+  """
+  @spec generate_stream(String.t(), map(), pid()) :: :ok
+  def generate_stream(prompt, context, pid) do
+    Pipeline.run(prompt, context, fn
+      {:component_ready, r} -> send(pid, {:resonance, {:component_ready, r}})
+      :done -> send(pid, {:resonance, :done})
+      {:error, reason} -> send(pid, {:resonance, {:error, reason}})
+      {:tool_calls, _} -> :ok
+    end)
   end
 end
