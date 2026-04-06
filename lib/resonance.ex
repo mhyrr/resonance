@@ -2,9 +2,14 @@ defmodule Resonance do
   @moduledoc """
   Generative analysis surfaces for Phoenix LiveView.
 
-  Resonance lets users ask questions about application data and receive
-  composed, app-native UI — reports, dashboards, and contextual insights —
-  built from semantic primitives and streamed in real-time via LiveView.
+  **Resonance lets the user's question pick from the developer's design system.**
+
+  The LLM doesn't invent UI — the developer brings the look, the components,
+  and the data. Resonance is the runtime that lets a user's natural-language
+  question compose those into a view, at query time, live. Users ask
+  questions about application data and receive composed, app-native UI —
+  reports, dashboards, contextual insights — built from semantic primitives
+  and streamed in real-time via LiveView.
 
   ## Quick Start
 

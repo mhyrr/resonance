@@ -4,6 +4,10 @@
 
 An Elixir library that lets users ask questions about application data and receive composed, app-native UI (reports, dashboards, contextual insights) built from semantic primitives and streamed in real-time via LiveView.
 
+> **Guiding line:** *Resonance lets the user's question pick from the developer's design system.*
+>
+> The LLM doesn't invent UI. The developer brings the look, the components, and the data; Resonance is the runtime that lets a user's natural-language question compose those into a view, at query time, live.
+
 ## How It Works
 
 ```
