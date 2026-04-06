@@ -18,7 +18,7 @@ defmodule Resonance.Live.Report do
   use Phoenix.LiveComponent
 
   require Logger
-  alias Resonance.{Composer, Layout, LLM, Registry, Renderable}
+  alias Resonance.{Layout, Pipeline, Renderable}
 
   @impl true
   def mount(socket) do
@@ -170,114 +170,43 @@ defmodule Resonance.Live.Report do
   end
 
   defp start_generation(socket, prompt) do
-    socket = assign(socket, loading: true, components: [], prompt: prompt, error: nil)
-
-    context = %{
-      resolver: socket.assigns.resolver,
-      current_user: socket.assigns[:current_user],
-      presenter: socket.assigns[:presenter]
-    }
-
-    component_id = socket.assigns.id
-    lv_pid = self()
-
-    Task.Supervisor.start_child(Resonance.TaskSupervisor, fn ->
-      try do
-        case LLM.chat(prompt, Registry.all_schemas(), context) do
-          {:ok, tool_calls} ->
-            Logger.info(
-              "[Resonance] LLM returned #{length(tool_calls)} tool call(s): #{Enum.map_join(tool_calls, ", ", & &1.name)}"
-            )
-
-            send_update(lv_pid, __MODULE__,
-              id: component_id,
-              resonance_tool_calls: tool_calls
-            )
-
-            resolve_and_stream(tool_calls, context, lv_pid, component_id)
-
-          {:error, reason} ->
-            Logger.error("[Resonance] LLM call failed: #{inspect(reason)}")
-
-            send_update(lv_pid, __MODULE__,
-              id: component_id,
-              resonance_result: {:error, reason}
-            )
-        end
-      rescue
-        e ->
-          send_update(lv_pid, __MODULE__,
-            id: component_id,
-            resonance_result: {:error, {:internal_error, Exception.message(e)}}
-          )
-      catch
-        :exit, reason ->
-          send_update(lv_pid, __MODULE__,
-            id: component_id,
-            resonance_result: {:error, {:task_exit, inspect(reason)}}
-          )
-      end
-    end)
-
-    socket
+    Pipeline.run(prompt, build_context(socket), report_sink(socket))
+    assign(socket, loading: true, components: [], prompt: prompt, error: nil)
   end
 
   defp refresh_data(socket) do
-    socket = assign(socket, loading: true, error: nil)
+    Pipeline.resolve(socket.assigns.tool_calls, build_context(socket), report_sink(socket))
+    assign(socket, loading: true, error: nil)
+  end
 
-    context = %{
+  defp build_context(socket) do
+    %{
       resolver: socket.assigns.resolver,
       current_user: socket.assigns[:current_user],
       presenter: socket.assigns[:presenter]
     }
-
-    tool_calls = socket.assigns.tool_calls
-    component_id = socket.assigns.id
-    lv_pid = self()
-
-    Task.Supervisor.start_child(Resonance.TaskSupervisor, fn ->
-      try do
-        resolve_and_stream(tool_calls, context, lv_pid, component_id)
-      rescue
-        e ->
-          send_update(lv_pid, __MODULE__,
-            id: component_id,
-            resonance_result: {:error, {:internal_error, Exception.message(e)}}
-          )
-      end
-    end)
-
-    socket
   end
 
-  defp resolve_and_stream(tool_calls, context, lv_pid, component_id) do
-    tool_calls
-    |> Enum.with_index()
-    |> Task.async_stream(
-      fn {call, idx} ->
-        renderable = Composer.resolve_one(call, context)
-        # Deterministic ID: same tool calls always produce same DOM IDs
-        stable_id = "#{call.name}-#{idx}"
-        %{renderable | id: stable_id}
-      end,
-      timeout: 30_000,
-      on_timeout: :kill_task
-    )
-    |> Enum.each(fn
-      {:ok, renderable} ->
-        send_update(lv_pid, __MODULE__,
-          id: component_id,
-          resonance_component: renderable
-        )
+  # Sink closure bound to this component's id and PID. Pipeline events
+  # get translated to send_update calls that flow back into update/2 via
+  # handle_streaming_component, handle_tool_calls, handle_done, handle_error.
+  defp report_sink(socket) do
+    lv_pid = self()
+    component_id = socket.assigns.id
 
-      {:exit, :timeout} ->
-        send_update(lv_pid, __MODULE__,
-          id: component_id,
-          resonance_component: Renderable.error("unknown", :timeout)
-        )
-    end)
+    fn
+      {:tool_calls, calls} ->
+        send_update(lv_pid, __MODULE__, id: component_id, resonance_tool_calls: calls)
 
-    send_update(lv_pid, __MODULE__, id: component_id, resonance_done: true)
+      {:component_ready, renderable} ->
+        send_update(lv_pid, __MODULE__, id: component_id, resonance_component: renderable)
+
+      :done ->
+        send_update(lv_pid, __MODULE__, id: component_id, resonance_done: true)
+
+      {:error, reason} ->
+        send_update(lv_pid, __MODULE__, id: component_id, resonance_result: {:error, reason})
+    end
   end
 
   @impl true
