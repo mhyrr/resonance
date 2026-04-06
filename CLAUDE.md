@@ -23,7 +23,7 @@ find module/function definitions.
 - `cd example/resonance_demo && mix phx.server` — Start demo (needs ANTHROPIC_API_KEY)
 - `cd example/resonance_demo && mix ecto.reset` — Reset demo database with seeds
 - `cd example/resonance_demo && mix test` — Run demo app tests
-- **NEVER** run the server yourself — user manages it separately
+- Server needs ANTHROPIC_API_KEY in the environment for LLM calls
 
 ### Testing
 - `mix test` — Library tests

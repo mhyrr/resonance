@@ -5,6 +5,8 @@ defmodule Resonance.Components.ErrorDisplay do
 
   use Phoenix.Component
 
+  @behaviour Resonance.Component
+
   def render(assigns) do
     ~H"""
     <div class="resonance-component resonance-error">

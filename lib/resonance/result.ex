@@ -26,6 +26,7 @@ defmodule Resonance.Result do
           metadata: map()
         }
 
+  @derive Jason.Encoder
   @enforce_keys [:kind, :title]
   defstruct [:kind, :title, :intent, data: [], summary: %{}, metadata: %{}]
 

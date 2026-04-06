@@ -34,103 +34,109 @@ defmodule Resonance.Live.Report do
 
   @impl true
   def update(assigns, socket) do
-    socket =
+    {:ok,
+     socket
+     |> apply_base_assigns(assigns)
+     |> handle_streaming_component(assigns)
+     |> handle_tool_calls(assigns)
+     |> handle_done(assigns)
+     |> handle_error(assigns)
+     |> handle_set_prompt(assigns)
+     |> handle_regenerate(assigns)
+     |> handle_refresh(assigns)
+     |> handle_assign_updates(assigns)}
+  end
+
+  defp apply_base_assigns(socket, assigns) do
+    socket
+    |> assign(:id, assigns.id)
+    |> assign_new(:resolver, fn -> assigns[:resolver] end)
+    |> assign_new(:current_user, fn -> assigns[:current_user] end)
+    |> assign_new(:presenter, fn -> assigns[:presenter] end)
+    |> assign_new(:components, fn -> [] end)
+    |> assign_new(:loading, fn -> false end)
+    |> assign_new(:prompt, fn -> "" end)
+    |> assign_new(:error, fn -> nil end)
+  end
+
+  # Handle streaming: individual component arrivals.
+  # If a renderable with the same ID exists, replace it in-place and
+  # push new data to the chart hook via event (bypasses phx-update="ignore").
+  # Otherwise append (initial generation).
+  defp handle_streaming_component(socket, %{resonance_component: %Renderable{} = renderable}) do
+    existing = socket.assigns.components
+
+    if Enum.any?(existing, &(&1.id == renderable.id)) do
+      updated =
+        Enum.map(existing, fn r ->
+          if r.id == renderable.id, do: renderable, else: r
+        end)
+
       socket
-      |> assign(:id, assigns.id)
-      |> assign_new(:resolver, fn -> assigns[:resolver] end)
-      |> assign_new(:current_user, fn -> assigns[:current_user] end)
-      |> assign_new(:presenter, fn -> assigns[:presenter] end)
-      |> assign_new(:components, fn -> [] end)
-      |> assign_new(:loading, fn -> false end)
-      |> assign_new(:prompt, fn -> "" end)
-      |> assign_new(:error, fn -> nil end)
+      |> assign(:components, updated)
+      |> push_chart_update(renderable)
+    else
+      assign(socket, :components, existing ++ [renderable])
+    end
+  end
 
-    # Handle streaming: individual component arrivals
-    # If a renderable with the same ID exists, replace it in-place and
-    # push new data to the chart hook via event (bypasses phx-update="ignore").
-    # Otherwise append (initial generation).
-    socket =
-      case assigns[:resonance_component] do
-        %Renderable{} = renderable ->
-          existing = socket.assigns.components
+  defp handle_streaming_component(socket, _assigns), do: socket
 
-          if Enum.any?(existing, &(&1.id == renderable.id)) do
-            updated =
-              Enum.map(existing, fn r ->
-                if r.id == renderable.id, do: renderable, else: r
-              end)
+  # Handle streaming: store tool calls for refresh.
+  defp handle_tool_calls(socket, %{resonance_tool_calls: calls}) when is_list(calls) do
+    assign(socket, tool_calls: calls)
+  end
 
-            socket = assign(socket, :components, updated)
-            push_chart_update(socket, renderable)
-          else
-            assign(socket, :components, existing ++ [renderable])
-          end
+  defp handle_tool_calls(socket, _assigns), do: socket
 
-        _ ->
-          socket
-      end
+  # Handle streaming: done signal.
+  defp handle_done(socket, %{resonance_done: true}), do: assign(socket, loading: false)
+  defp handle_done(socket, _assigns), do: socket
 
-    # Handle streaming: store tool calls for refresh
-    socket =
-      case assigns[:resonance_tool_calls] do
-        calls when is_list(calls) -> assign(socket, tool_calls: calls)
-        _ -> socket
-      end
+  # Handle batch result (error path fallback).
+  defp handle_error(socket, %{resonance_result: {:error, reason}}) do
+    assign(socket, error: reason, loading: false)
+  end
 
-    # Handle streaming: done signal
-    socket =
-      case assigns[:resonance_done] do
-        true -> assign(socket, loading: false)
-        _ -> socket
-      end
+  defp handle_error(socket, _assigns), do: socket
 
-    # Handle batch result (error path fallback)
-    socket =
-      case assigns[:resonance_result] do
-        {:error, reason} -> assign(socket, error: reason, loading: false)
-        _ -> socket
-      end
+  # Handle prompt set from parent (e.g. clicking a suggestion).
+  defp handle_set_prompt(socket, %{set_prompt: prompt}) when is_binary(prompt) do
+    socket
+    |> assign(:prompt, prompt)
+    |> push_event("resonance:set-prompt", %{prompt: prompt})
+  end
 
-    # Handle prompt set from parent (e.g. clicking a suggestion)
-    socket =
-      case assigns[:set_prompt] do
-        prompt when is_binary(prompt) ->
-          socket
-          |> assign(:prompt, prompt)
-          |> push_event("resonance:set-prompt", %{prompt: prompt})
+  defp handle_set_prompt(socket, _assigns), do: socket
 
-        _ ->
-          socket
-      end
+  # Handle regenerate from parent (full LLM call + resolve).
+  defp handle_regenerate(socket, %{regenerate: prompt})
+       when is_binary(prompt) and byte_size(prompt) > 0 do
+    start_generation(socket, prompt)
+  end
 
-    # Handle regenerate from parent (full LLM call + resolve)
-    socket =
-      case assigns[:regenerate] do
-        prompt when is_binary(prompt) and byte_size(prompt) > 0 ->
-          start_generation(socket, prompt)
+  defp handle_regenerate(socket, _assigns), do: socket
 
-        _ ->
-          socket
-      end
+  # Handle refresh from parent (re-resolve same tool calls, no LLM).
+  defp handle_refresh(socket, %{refresh: true}) do
+    if socket.assigns.tool_calls != nil do
+      refresh_data(socket)
+    else
+      socket
+    end
+  end
 
-    # Handle refresh from parent (re-resolve same tool calls, no LLM)
-    socket =
-      case assigns[:refresh] do
-        true when socket.assigns.tool_calls != nil ->
-          refresh_data(socket)
+  defp handle_refresh(socket, _assigns), do: socket
 
-        _ ->
-          socket
-      end
-
-    # Allow resolver and presenter to be updated
-    socket =
-      if assigns[:resolver], do: assign(socket, :resolver, assigns.resolver), else: socket
-
-    socket =
-      if assigns[:presenter], do: assign(socket, :presenter, assigns.presenter), else: socket
-
-    {:ok, socket}
+  # Allow resolver and presenter to be updated from parent assigns.
+  defp handle_assign_updates(socket, assigns) do
+    socket
+    |> then(fn s ->
+      if assigns[:resolver], do: assign(s, :resolver, assigns.resolver), else: s
+    end)
+    |> then(fn s ->
+      if assigns[:presenter], do: assign(s, :presenter, assigns.presenter), else: s
+    end)
   end
 
   @impl true

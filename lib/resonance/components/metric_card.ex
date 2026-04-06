@@ -5,6 +5,8 @@ defmodule Resonance.Components.MetricCard do
 
   use Phoenix.Component
 
+  @behaviour Resonance.Component
+
   def render(assigns) do
     assigns =
       assigns

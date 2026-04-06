@@ -158,12 +158,6 @@ defmodule Resonance.Presenters.Default do
   end
 
   defp detect_format(row) do
-    value = row[:value] || row["value"] || 0
-
-    cond do
-      is_float(value) and value < 1 -> "percent"
-      is_number(value) and value > 1000 -> "currency"
-      true -> "number"
-    end
+    row[:format] || row["format"] || "number"
   end
 end

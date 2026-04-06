@@ -6,6 +6,8 @@ defmodule Resonance.Components.PieChart do
 
   use Phoenix.Component
 
+  @behaviour Resonance.Component
+
   @doc false
   def chart_dom_id(renderable_id), do: "resonance-pie-#{renderable_id}"
 

@@ -10,6 +10,7 @@ defmodule Resonance.LLM.ToolCall do
           arguments: map()
         }
 
+  @derive Jason.Encoder
   @enforce_keys [:name, :arguments]
   defstruct [:id, :name, :arguments]
 end

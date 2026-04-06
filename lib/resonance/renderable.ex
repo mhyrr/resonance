@@ -15,6 +15,7 @@ defmodule Resonance.Renderable do
           error: term() | nil
         }
 
+  @derive {Jason.Encoder, only: [:id, :type, :props, :status]}
   @enforce_keys [:id, :type, :component, :status]
   defstruct [:id, :type, :component, :props, :status, :error]
 

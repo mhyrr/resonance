@@ -29,6 +29,7 @@ defmodule Resonance.QueryIntent do
           required(:direction) => :asc | :desc
         }
 
+  @derive Jason.Encoder
   @enforce_keys [:dataset, :measures]
   defstruct [:dataset, :measures, :dimensions, :filters, :sort, :limit]
 

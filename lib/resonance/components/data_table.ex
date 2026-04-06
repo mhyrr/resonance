@@ -5,6 +5,8 @@ defmodule Resonance.Components.DataTable do
 
   use Phoenix.Component
 
+  @behaviour Resonance.Component
+
   def render(assigns) do
     assigns =
       assigns
