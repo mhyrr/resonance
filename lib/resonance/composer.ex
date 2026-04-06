@@ -92,8 +92,10 @@ defmodule Resonance.Composer do
 
                 presenter = context[:presenter] || Resonance.Presenters.Default
                 renderable = presenter.present(result, context)
-                # Stamp source metadata so refine/2 can re-resolve later.
-                %{renderable | result: result, primitive: name}
+                # Stamp the source Result onto the Renderable as an
+                # introspection-only paper trail. Widgets must not read it
+                # at runtime — see Resonance.Renderable docs.
+                %{renderable | result: result}
 
               {:error, reason} ->
                 Logger.warning(

@@ -2,78 +2,112 @@ defmodule Resonance.Widget do
   @moduledoc """
   Behaviour for interactive Resonance widgets.
 
-  A Widget is a Phoenix LiveComponent that knows how to render a
-  `Resonance.Renderable` and how to react to user gestures. Widgets are the
-  developer-supplied surface that turns a read-only Resonance report into an
-  interactive UI page.
+  A Widget is a Phoenix LiveComponent that knows it can render certain
+  Resonance `Result` kinds. After Resonance composes the page from the user's
+  question, the widget is **just a Phoenix LiveComponent** — it calls your
+  app's contexts from `handle_event/3`, subscribes to `Phoenix.PubSub` for
+  live updates, manages local state in socket assigns, and handles mutations
+  the way every other LiveComponent does. **The library composes; Phoenix
+  runs.**
 
   ## Usage
 
       defmodule MyApp.Widgets.FilterableLeaderboard do
         use Resonance.Widget
 
+        alias MyApp.Deals
+
         @impl Resonance.Widget
         def accepts_results, do: [:ranking]
 
         @impl Resonance.Widget
-        def capabilities, do: [:refine]
+        def capabilities, do: [:filter, :live_updates]
 
         @impl Resonance.Widget
         def example_renderable do
+          # Synthetic Renderable for the playground.
           %Resonance.Renderable{
             id: "example",
-            type: "ranking",
+            type: "rank_entities",
             component: __MODULE__,
-            props: %{title: "Top reps", rows: [...]},
+            props: %{title: "Top deals (example)", rows: [...]},
             status: :ready,
             render_via: :live
           }
         end
 
-        # Standard LiveComponent callbacks below
+        # Optional: only used by the playground when on_mount provides a
+        # widget_assigns map. Returns a Renderable built from real data
+        # fetched via your own contexts.
+        def playground_renderable(widget_assigns) do
+          rows = widget_assigns.deals_ctx.top_by_value(limit: 10)
+          Resonance.Renderable.ready_live(
+            "rank_entities",
+            __MODULE__,
+            %{title: "Top deals", rows: rows}
+          )
+        end
+
+        # Standard Phoenix.LiveComponent callbacks below — Resonance has
+        # nothing to teach you here.
+        @impl Phoenix.LiveComponent
+        def mount(socket) do
+          if connected?(socket), do: Phoenix.PubSub.subscribe(MyApp.PubSub, "deals")
+          {:ok, socket}
+        end
+
         @impl Phoenix.LiveComponent
         def update(%{renderable: r} = assigns, socket) do
-          {:ok, assign(socket, :renderable, r)}
+          {:ok,
+           socket
+           |> assign(:title, r.props.title)
+           |> assign(:rows, r.props.rows)
+           |> assign(:current_user, assigns[:current_user])}
         end
 
-        def handle_event("filter", %{"stage" => stage}, socket) do
-          {:ok, refined} =
-            Resonance.refine(socket.assigns.renderable, fn intent ->
-              update_in(intent.filters, &[%{field: "stage", op: "=", value: stage} | &1 || []])
-            end)
-
-          {:noreply, assign(socket, :renderable, refined)}
+        @impl Phoenix.LiveComponent
+        def handle_event("filter_stage", %{"stage" => stage}, socket) do
+          rows = Deals.top_by_value(stage: stage, user: socket.assigns.current_user)
+          {:noreply, assign(socket, :rows, rows)}
         end
 
-        def render(assigns), do: ~H\"\"\"...\"\"\"
+        @impl Phoenix.LiveComponent
+        def handle_info({:deals_changed, _}, socket) do
+          rows = Deals.top_by_value(user: socket.assigns.current_user)
+          {:noreply, assign(socket, :rows, rows)}
+        end
+
+        def render(assigns), do: ~H"..."
       end
 
   ## The contract
 
-  - `accepts_results/0` (required) — list of `Resonance.Result` kinds this
-    widget can render. Powers Presenter dispatch and playground enumeration.
-  - `capabilities/0` (optional, default `[]`) — declares which user gestures
-    the widget supports (`:refine`, `:mutate`, `:drilldown`). Documentation
-    in v2; future versions may feed this into the LLM's system prompt.
-  - `example_renderable/0` (optional) — synthetic `Renderable` used by the
-    playground to render the widget without real data.
-  - **From `Phoenix.LiveComponent`:** `update/2` must accept an assign named
-    `:renderable` carrying a `%Resonance.Renderable{}` (which includes the
-    `Result`, the `QueryIntent`, and a stable id).
-
-  To re-resolve a Renderable with a tweaked QueryIntent (filter changes,
-  drilldown), call `Resonance.refine/2`. To mutate app state, call your own
-  contexts from `handle_event/3` like any LiveComponent.
+  - **Required:** `accepts_results/0` returns the list of `Resonance.Result`
+    kinds this widget can render. Drives Presenter dispatch and playground
+    enumeration.
+  - **Optional:** `capabilities/0` declares which user gestures the widget
+    supports (developer documentation; the playground shows them).
+  - **Optional:** `example_renderable/0` returns a synthetic `Renderable` the
+    playground draws against when no live context is wired.
+  - **Optional:** `playground_renderable/1` takes the on-mount-provided
+    `widget_assigns` map and returns a `Renderable` built from real data.
+    The widget builds it however it wants — typically by calling its own
+    app contexts.
+  - **From `Phoenix.LiveComponent`:** `update/2` accepts a `:renderable`
+    assign carrying a `%Resonance.Renderable{}`. The widget reads `:props`
+    off it for initial state. Everything else is normal LiveComponent.
 
   ## Symmetry with `Resonance.Component`
 
-  `Resonance.Component` is the read-only contract for function components.
-  `Resonance.Widget` is the interactive contract for LiveComponents. A
-  Presenter may map a given Result kind to either kind of target by setting
-  `render_via: :function | :live` on the `%Renderable{}` it produces.
+  `Resonance.Component` is the read-only contract for function components
+  (charts, tables, prose). `Resonance.Widget` is the interactive contract
+  for LiveComponents. A Presenter may map a `Result` kind to either by
+  calling `Renderable.ready/3` or `Renderable.ready_live/3`. The two
+  contracts are parallel and independent — pick whichever each `Result`
+  kind needs.
   """
 
-  @type capability :: :refine | :mutate | :drilldown
+  @type capability :: atom()
 
   @doc """
   The list of `Resonance.Result` kinds this widget can render.
@@ -85,33 +119,34 @@ defmodule Resonance.Widget do
   @doc """
   The user gestures this widget supports.
 
-  Optional. Defaults to `[]` when not implemented.
+  Optional. Defaults to `[]` when not implemented. Documentation only —
+  the playground shows it; nothing in the runtime depends on it.
   """
   @callback capabilities() :: [capability()]
 
   @doc """
-  A synthetic Renderable for use in the playground.
+  A synthetic `Renderable` for the playground.
 
   Optional. Widgets that omit this callback can still be enumerated by the
-  playground but won't be auto-rendered.
+  playground but won't be auto-rendered against synthetic data.
   """
   @callback example_renderable() :: Resonance.Renderable.t()
 
   @doc """
-  A Renderable produced from real data via the given context's resolver.
+  A `Renderable` built from real data, for the playground.
 
-  Optional. Used by the playground when a context is configured (e.g. via an
-  `on_mount` hook in the consuming app's router) so widgets render against
-  live data instead of the synthetic `example_renderable/0`.
-
-  Implementations typically build a `QueryIntent`, call
-  `Resonance.Primitive.resolve_with_intent/4`, and wrap the result in a
-  `Renderable` whose `component` is the widget itself. The widget can then
-  be re-resolved on user gestures via `Resonance.refine/3`.
+  Optional. Receives the `widget_assigns` map an `on_mount` hook attached
+  to the playground (typically containing handles to app contexts and the
+  current user). Returns a `Renderable` built however the widget wants —
+  usually by calling app contexts directly.
   """
-  @callback live_renderable(context :: map()) :: {:ok, Resonance.Renderable.t()} | {:error, term()}
+  @callback playground_renderable(widget_assigns :: map()) :: Resonance.Renderable.t()
 
-  @optional_callbacks [capabilities: 0, example_renderable: 0, live_renderable: 1]
+  @optional_callbacks [
+    capabilities: 0,
+    example_renderable: 0,
+    playground_renderable: 1
+  ]
 
   @doc """
   Returns the capabilities declared by a widget module, or `[]` if the
@@ -140,17 +175,19 @@ defmodule Resonance.Widget do
   end
 
   @doc """
-  Returns a live Renderable for a widget module by calling its
-  `live_renderable/1` callback with the given context.
-
-  Returns `:not_implemented` if the callback isn't defined, `{:ok, r}` on
-  success, or `{:error, reason}` on resolver/validation failures.
+  Returns a Renderable built from real data via a widget's
+  `playground_renderable/1` callback, or `:not_implemented` if the optional
+  callback isn't defined. Returns `{:error, reason}` if the callback raises.
   """
-  @spec live_renderable(module(), map()) ::
+  @spec playground_renderable(module(), map()) ::
           {:ok, Resonance.Renderable.t()} | {:error, term()} | :not_implemented
-  def live_renderable(widget_module, context) do
-    if function_exported?(widget_module, :live_renderable, 1) do
-      widget_module.live_renderable(context)
+  def playground_renderable(widget_module, widget_assigns) do
+    if function_exported?(widget_module, :playground_renderable, 1) do
+      try do
+        {:ok, widget_module.playground_renderable(widget_assigns)}
+      rescue
+        e -> {:error, Exception.message(e)}
+      end
     else
       :not_implemented
     end

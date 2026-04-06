@@ -2,17 +2,16 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
   @moduledoc """
   Interactive trend sparkline.
 
-  Renders a `:comparison` Result (deals grouped by quarter) as an inline SVG
-  sparkline with min/max/latest annotations and lets the user narrow the
-  trend to a single deal stage without an LLM round-trip.
+  Renders a `:comparison` Result (deals grouped by quarter) as an inline
+  SVG sparkline and lets the user narrow the trend to a single deal stage.
+  Stage chip clicks call `Deals.by_quarter/1` directly.
 
-  The interaction is a `Resonance.refine/3` call that adds (or removes) a
-  `stage = ...` filter on the existing `QueryIntent`. The widget reads its
-  active stage straight off the refined intent so the chips stay accurate
-  after a refresh.
+  Subscribes to the `"deals"` PubSub topic for live updates.
   """
 
   use Resonance.Widget
+
+  alias ResonanceDemo.Deals
 
   @stages ~w(prospecting discovery proposal negotiation closed_won closed_lost)
 
@@ -20,39 +19,7 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
   def accepts_results, do: [:comparison]
 
   @impl Resonance.Widget
-  def capabilities, do: [:refine]
-
-  @impl Resonance.Widget
-  def live_renderable(context) do
-    intent = %Resonance.QueryIntent{
-      dataset: "deals",
-      measures: ["sum(value)"],
-      dimensions: ["quarter"]
-    }
-
-    case Resonance.Primitive.resolve_with_intent(
-           :comparison,
-           intent,
-           "Pipeline value over time",
-           context
-         ) do
-      {:ok, %Resonance.Result{} = result} ->
-        {:ok,
-         %Resonance.Renderable{
-           id: "live-trend-sparkline",
-           type: "compare_over_time",
-           component: __MODULE__,
-           props: %{title: result.title, data: result.data},
-           status: :ready,
-           render_via: :live,
-           primitive: "compare_over_time",
-           result: result
-         }}
-
-      {:error, _} = error ->
-        error
-    end
-  end
+  def capabilities, do: [:filter, :live_updates]
 
   @impl Resonance.Widget
   def example_renderable do
@@ -71,123 +38,61 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
       component: __MODULE__,
       status: :ready,
       render_via: :live,
-      primitive: "compare_over_time",
-      props: %{title: "Pipeline value over time (example)", data: rows},
-      result: %Resonance.Result{
-        kind: :comparison,
+      props: %{
         title: "Pipeline value over time (example)",
-        data: rows,
-        intent: %Resonance.QueryIntent{
-          dataset: "deals",
-          measures: ["sum(value)"],
-          dimensions: ["quarter"],
-          filters: nil
-        }
+        rows: rows,
+        active_stage: nil
       }
     }
   end
 
+  @impl Resonance.Widget
+  def playground_renderable(_widget_assigns) do
+    rows = Deals.by_quarter()
+
+    Resonance.Renderable.ready_live("compare_over_time", __MODULE__, %{
+      title: "Pipeline value over time",
+      rows: rows,
+      active_stage: nil
+    })
+  end
+
   @impl Phoenix.LiveComponent
   def mount(socket) do
-    {:ok, assign(socket, stages: @stages, refine_error: nil, active_stage: nil)}
+    {:ok, assign(socket, stages: @stages)}
   end
 
   @impl Phoenix.LiveComponent
-  def update(%{renderable: renderable} = assigns, socket) do
+  def update(%{id: id, renderable: r} = assigns, socket) do
     {:ok,
      socket
-     |> assign(:renderable, renderable)
-     |> assign(:resolver, assigns[:resolver])
-     |> assign(:current_user, assigns[:current_user])
-     |> assign(:presenter, assigns[:presenter])
-     |> assign_active_stage_from_intent(renderable)}
+     |> assign(:id, id)
+     |> assign(:title, r.props[:title] || "Trend")
+     |> assign(:rows, r.props[:rows] || [])
+     |> assign(:active_stage, r.props[:active_stage])
+     |> assign(:current_user, assigns[:current_user])}
   end
-
-  defp assign_active_stage_from_intent(socket, %Resonance.Renderable{
-         result: %Resonance.Result{intent: %Resonance.QueryIntent{filters: filters}}
-       }) do
-    stage =
-      case filters do
-        list when is_list(list) ->
-          case Enum.find(list, fn f -> f.field == "stage" end) do
-            %{value: s} -> s
-            _ -> nil
-          end
-
-        _ ->
-          nil
-      end
-
-    assign(socket, :active_stage, stage)
-  end
-
-  defp assign_active_stage_from_intent(socket, _), do: assign(socket, :active_stage, nil)
 
   @impl Phoenix.LiveComponent
   def handle_event("set_stage", %{"stage" => stage}, socket) do
-    refine_with(socket, fn intent ->
-      filters = drop_stage(intent.filters) ++ [%{field: "stage", op: "=", value: stage}]
-      %{intent | filters: filters}
-    end)
+    rows = Deals.by_quarter(stage: stage)
+    {:noreply, socket |> assign(:active_stage, stage) |> assign(:rows, rows)}
   end
 
   def handle_event("clear_stage", _params, socket) do
-    refine_with(socket, fn intent ->
-      case drop_stage(intent.filters) do
-        [] -> %{intent | filters: nil}
-        rest -> %{intent | filters: rest}
-      end
-    end)
+    rows = Deals.by_quarter()
+    {:noreply, socket |> assign(:active_stage, nil) |> assign(:rows, rows)}
   end
-
-  defp refine_with(socket, intent_fn) do
-    if is_nil(socket.assigns[:resolver]) do
-      {:noreply,
-       assign(socket,
-         refine_error: "Filter only works inside Live.Report with a resolver in context."
-       )}
-    else
-      context = %{
-        resolver: socket.assigns[:resolver],
-        current_user: socket.assigns[:current_user],
-        presenter: socket.assigns[:presenter]
-      }
-
-      case Resonance.refine(socket.assigns.renderable, intent_fn, context) do
-        {:ok, refined} ->
-          {:noreply,
-           socket
-           |> assign(:renderable, refined)
-           |> assign(:refine_error, nil)
-           |> assign_active_stage_from_intent(refined)}
-
-        {:error, reason} ->
-          {:noreply, assign(socket, :refine_error, format_error(reason))}
-      end
-    end
-  end
-
-  defp drop_stage(nil), do: []
-  defp drop_stage(filters), do: Enum.reject(filters, fn f -> f.field == "stage" end)
-
-  defp format_error({:invalid_field, field, msg}), do: "Invalid #{field}: #{msg}"
-  defp format_error({:unsupported_query, dataset}), do: "Cannot trend #{dataset}."
-  defp format_error(other), do: "Refine failed: #{inspect(other)}"
 
   @impl Phoenix.LiveComponent
   def render(assigns) do
-    rows = rows(assigns.renderable)
-    summary = sparkline_summary(rows)
-
-    assigns =
-      assigns
-      |> assign(:rows, rows)
-      |> assign(:summary, summary)
+    summary = sparkline_summary(assigns.rows)
+    assigns = assign(assigns, :summary, summary)
 
     ~H"""
     <div class="resonance-component resonance-widget trend-sparkline rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div class="flex items-baseline justify-between mb-4">
-        <h3 class="text-base font-semibold text-gray-900">{@renderable.props[:title] || "Trend"}</h3>
+        <h3 class="text-base font-semibold text-gray-900">{@title}</h3>
         <span class="text-xs uppercase tracking-wide text-gray-400">Interactive</span>
       </div>
 
@@ -226,21 +131,17 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
         <% end %>
       </div>
 
-      <div :if={@refine_error} class="mb-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800">
-        {@refine_error}
-      </div>
-
       <div class="flex items-end gap-6">
         <div class="flex-1 min-w-0">
           <%= if @summary.path do %>
             <svg viewBox="0 0 400 100" preserveAspectRatio="none" class="w-full h-24">
               <defs>
-                <linearGradient id={"grad-#{@renderable.id}"} x1="0" x2="0" y1="0" y2="1">
+                <linearGradient id={"grad-" <> @id} x1="0" x2="0" y1="0" y2="1">
                   <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.35" />
                   <stop offset="100%" stop-color="#3b82f6" stop-opacity="0" />
                 </linearGradient>
               </defs>
-              <path d={@summary.fill} fill={"url(#grad-#{@renderable.id})"}></path>
+              <path d={@summary.fill} fill={"url(#grad-" <> @id <> ")"}></path>
               <path d={@summary.path} fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
               <%= for {x, y} <- @summary.points do %>
                 <circle cx={x} cy={y} r="3" fill="#3b82f6"></circle>
@@ -272,10 +173,6 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
       </div>
     </div>
     """
-  end
-
-  defp rows(%Resonance.Renderable{props: props}) do
-    props[:data] || props["data"] || []
   end
 
   defp row_label(row), do: row[:label] || row["label"] || row[:period] || row["period"] || "—"

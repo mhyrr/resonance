@@ -1,10 +1,11 @@
 defmodule Resonance.Live.Playground do
   @moduledoc """
   Library-provided LiveView that enumerates `Resonance.Widget`-implementing
-  modules in the running application(s), shows their declared metadata
-  (`accepts_results/0`, `capabilities/0`), and renders each one against either
-  its synthetic `example_renderable/0` or — when a context is configured —
-  its `live_renderable/1` against real data through the actual resolver.
+  modules in the running application(s), shows their declared metadata, and
+  renders each one against either its synthetic `example_renderable/0` or —
+  when an `on_mount` hook provides `widget_assigns` — its
+  `playground_renderable/1` against real data via the developer's own
+  contexts.
 
   ## Mounting in your app
 
@@ -13,12 +14,13 @@ defmodule Resonance.Live.Playground do
       # router.ex
       live "/resonance/playground", Resonance.Live.Playground
 
-  ### Live data (the playground talks to your real resolver)
+  ### Live data (the playground passes app handles to your widgets)
 
-  Add an `on_mount` hook that puts the resolver context (and optionally a
-  simulator function) into socket assigns. When the playground sees
-  `:resonance_context` in assigns, it prefers each widget's
-  `live_renderable/1` over its synthetic example.
+  Add an `on_mount` hook that puts a `widget_assigns` map into socket assigns.
+  When the playground sees `:widget_assigns`, it prefers each widget's
+  `playground_renderable/1` over its synthetic example, and merges
+  `widget_assigns` into every mounted widget so the widget can call your
+  contexts directly.
 
       # router.ex
       live_session :playground, on_mount: MyAppWeb.PlaygroundContext do
@@ -32,9 +34,12 @@ defmodule Resonance.Live.Playground do
         def on_mount(:default, _params, _session, socket) do
           {:cont,
            socket
-           |> assign(:resonance_context, %{resolver: MyApp.DataResolver})
+           |> assign(:widget_assigns, %{
+             deals_ctx: MyApp.Deals,
+             current_user: nil
+           })
            |> assign(:simulate_label, "Simulate New Data")
-           |> assign(:simulate_fn, &MyApp.Demo.simulate/0)}
+           |> assign(:simulate_fn, &MyApp.Demo.simulate_and_broadcast/0)}
         end
       end
 
@@ -43,8 +48,9 @@ defmodule Resonance.Live.Playground do
   - `accepts_results/0` (required) — drives the index list and metadata table.
   - `capabilities/0` (optional) — shown in the metadata table.
   - `example_renderable/0` (optional) — synthetic data for the static path.
-  - `live_renderable/1` (optional) — real-data path; takes the resonance
-    context, returns `{:ok, renderable}` or `{:error, reason}`.
+  - `playground_renderable/1` (optional) — real-data path; receives the
+    `widget_assigns` map and returns a `Renderable` built from the widget's
+    own contexts.
 
   The playground is intentionally a developer tool, not a production page —
   it ships with minimal styling and no auth. Don't mount it under a public
@@ -57,17 +63,43 @@ defmodule Resonance.Live.Playground do
   def mount(_params, _session, socket) do
     widgets = discover_widgets()
 
+    socket =
+      socket
+      |> assign_new(:widget_assigns, fn -> nil end)
+      |> assign_new(:simulate_fn, fn -> nil end)
+      |> assign_new(:simulate_label, fn -> "Simulate" end)
+      |> assign_new(:pubsub, fn -> nil end)
+      |> assign_new(:subscribe_topics, fn -> [] end)
+
+    if connected?(socket) and socket.assigns.pubsub do
+      Enum.each(socket.assigns.subscribe_topics, fn topic ->
+        Phoenix.PubSub.subscribe(socket.assigns.pubsub, topic)
+      end)
+    end
+
     {:ok,
      socket
-     |> assign_new(:resonance_context, fn -> nil end)
-     |> assign_new(:simulate_fn, fn -> nil end)
-     |> assign_new(:simulate_label, fn -> "Simulate" end)
      |> assign(:widgets, widgets)
      |> assign(:selected, nil)
      |> assign(:current_renderable, nil)
      |> assign(:render_mode, :example)
      |> assign(:flash_message, nil)
      |> assign(:page_title, "Resonance Widget Playground")}
+  end
+
+  @impl true
+  def handle_info(_msg, socket) do
+    # Any subscribed topic message — re-resolve the current widget so its
+    # data refreshes. We don't inspect the message; the assumption is that
+    # if the developer asked us to subscribe to it, any message on it means
+    # data may have changed.
+    case socket.assigns.selected do
+      nil ->
+        {:noreply, socket}
+
+      selected ->
+        {:noreply, load_selected(socket, selected)}
+    end
   end
 
   @impl true
@@ -90,7 +122,7 @@ defmodule Resonance.Live.Playground do
   end
 
   defp load_selected(socket, selected) do
-    {renderable, mode} = resolve_renderable(selected, socket.assigns.resonance_context)
+    {renderable, mode} = resolve_renderable(selected, socket.assigns.widget_assigns)
 
     socket
     |> assign(:selected, selected)
@@ -103,8 +135,8 @@ defmodule Resonance.Live.Playground do
     {widget.example, if(widget.example, do: :example, else: :none)}
   end
 
-  defp resolve_renderable(widget, context) do
-    case Resonance.Widget.live_renderable(widget.module, context) do
+  defp resolve_renderable(widget, widget_assigns) do
+    case Resonance.Widget.playground_renderable(widget.module, widget_assigns) do
       {:ok, renderable} ->
         {renderable, :live}
 
@@ -172,28 +204,34 @@ defmodule Resonance.Live.Playground do
           That's the promise. The mechanism is small: an LLM picks
           <strong>semantic primitives</strong> (rank, compare, distribute, segment, summarize)
           over your data, a <strong>resolver</strong> you write fetches the rows, and a
-          <strong>presenter</strong> you write maps each result to a component. The
-          components can be read-only function components — or
-          <strong>interactive widgets</strong>: Phoenix LiveComponents that implement
+          <strong>presenter</strong> you write maps each result to a component. Read-only
+          results become <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">Resonance.Component</code>
+          function components (charts, tables, prose). Interactive results become
           <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">Resonance.Widget</code>
-          and re-resolve themselves on user gestures via
-          <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">Resonance.refine/3</code>,
-          no LLM round-trip, same trust boundary as the original query.
+          LiveComponents — and after Resonance composes the page, the widgets are
+          <em>just LiveComponents</em>: they call your contexts from
+          <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">handle_event/3</code>,
+          subscribe to <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">Phoenix.PubSub</code>
+          for live updates, and handle mutations the way every other LiveComponent does.
+          The library composes; Phoenix runs.
         </p>
         <p style="color: #4b5563; font-size: 0.95rem; line-height: 1.6; margin: 0 0 1rem;">
           This page is where you meet the widgets your app provides. Every loaded
           <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">Resonance.Widget</code>
-          shows up here. When the consuming app wires a resolver into the playground,
-          widgets render against <strong>real data</strong> through their
-          <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">live_renderable/1</code>
-          callback and refine actions actually fire; otherwise they fall back to
-          synthetic <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">example_renderable/0</code>
+          shows up here. When the consuming app wires
+          <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">widget_assigns</code>
+          into the playground via an
+          <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">on_mount</code>
+          hook, widgets render against <strong>real data</strong> through their optional
+          <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">playground_renderable/1</code>
+          callback; otherwise they fall back to synthetic
+          <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">example_renderable/0</code>
           data so you can still see them in isolation.
         </p>
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
           <p style="color: #6b7280; font-size: 0.85rem; margin: 0;">
             {length(@widgets)} widget{if length(@widgets) == 1, do: "", else: "s"} discovered
-            <%= if @resonance_context do %>
+            <%= if @widget_assigns do %>
               <span style="color: #059669; font-weight: 500;">· live data</span>
             <% else %>
               <span style="color: #9ca3af;">· synthetic data</span>
@@ -316,14 +354,12 @@ defmodule Resonance.Live.Playground do
 
             <div style="border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1.25rem; background: #fafafa;">
               <%= cond do %>
-                <% @current_renderable && @resonance_context -> %>
+                <% @current_renderable && @widget_assigns -> %>
                   <.live_component
                     module={@selected.module}
                     id={"playground-" <> @selected.short_name}
                     renderable={@current_renderable}
-                    resolver={@resonance_context[:resolver]}
-                    current_user={@resonance_context[:current_user]}
-                    presenter={@resonance_context[:presenter]}
+                    {@widget_assigns}
                   />
                 <% @current_renderable -> %>
                   <.live_component
@@ -333,7 +369,7 @@ defmodule Resonance.Live.Playground do
                   />
                 <% true -> %>
                   <div style="color: #9ca3af; padding: 1.5rem; text-align: center;">
-                    No <code>example_renderable/0</code> or <code>live_renderable/1</code>
+                    No <code>example_renderable/0</code> or <code>playground_renderable/1</code>
                     to render.
                   </div>
               <% end %>
@@ -371,7 +407,7 @@ defmodule Resonance.Live.Playground do
   defp mode_label(:example), do: "example data"
   defp mode_label(:none), do: "no data"
 
-  defp render_source_label(_, :live), do: "live_renderable/1"
+  defp render_source_label(_, :live), do: "playground_renderable/1"
   defp render_source_label(%{example: ex}, :example) when not is_nil(ex), do: "example_renderable/0"
   defp render_source_label(_, _), do: "—"
 

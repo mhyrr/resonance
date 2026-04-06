@@ -3,49 +3,23 @@ defmodule ResonanceDemoWeb.Widgets.PipelineFunnel do
   Interactive deal pipeline funnel.
 
   Renders a `:distribution` Result (deals grouped by stage) as a vertical
-  funnel and lets the user toggle the underlying measure between deal *count*
-  and total *value* without an LLM round-trip.
+  funnel and lets the user toggle the underlying measure between deal
+  *count* and total *value*. The toggle calls `Deals.by_stage_distribution/1`
+  directly — no Resonance machinery on the user-driven path.
 
-  The interaction is a `Resonance.refine/3` call that swaps the
-  `QueryIntent.measures` array — same dataset, same dimensions, different
-  aggregation. The widget reads the current mode straight off the Renderable's
-  intent so it stays in sync after a refresh.
+  Subscribes to the `"deals"` PubSub topic so the funnel auto-refreshes
+  whenever simulate fires.
   """
 
   use Resonance.Widget
+
+  alias ResonanceDemo.Deals
 
   @impl Resonance.Widget
   def accepts_results, do: [:distribution]
 
   @impl Resonance.Widget
-  def capabilities, do: [:refine]
-
-  @impl Resonance.Widget
-  def live_renderable(context) do
-    intent = %Resonance.QueryIntent{
-      dataset: "deals",
-      measures: ["count(*)"],
-      dimensions: ["stage"]
-    }
-
-    case Resonance.Primitive.resolve_with_intent(:distribution, intent, "Deal pipeline", context) do
-      {:ok, %Resonance.Result{} = result} ->
-        {:ok,
-         %Resonance.Renderable{
-           id: "live-pipeline-funnel",
-           type: "show_distribution",
-           component: __MODULE__,
-           props: %{title: result.title, data: result.data},
-           status: :ready,
-           render_via: :live,
-           primitive: "show_distribution",
-           result: result
-         }}
-
-      {:error, _} = error ->
-        error
-    end
-  end
+  def capabilities, do: [:measure_toggle, :live_updates]
 
   @impl Resonance.Widget
   def example_renderable do
@@ -64,91 +38,51 @@ defmodule ResonanceDemoWeb.Widgets.PipelineFunnel do
       component: __MODULE__,
       status: :ready,
       render_via: :live,
-      primitive: "show_distribution",
-      props: %{title: "Deal pipeline (example)", data: rows},
-      result: %Resonance.Result{
-        kind: :distribution,
-        title: "Deal pipeline (example)",
-        data: rows,
-        intent: %Resonance.QueryIntent{
-          dataset: "deals",
-          measures: ["count(*)"],
-          dimensions: ["stage"]
-        }
-      }
+      props: %{title: "Deal pipeline (example)", rows: rows, mode: :count}
     }
   end
 
-  @impl Phoenix.LiveComponent
-  def mount(socket) do
-    {:ok, assign(socket, refine_error: nil)}
+  @impl Resonance.Widget
+  def playground_renderable(_widget_assigns) do
+    rows = Deals.by_stage_distribution(mode: :count)
+
+    Resonance.Renderable.ready_live("show_distribution", __MODULE__, %{
+      title: "Deal pipeline",
+      rows: rows,
+      mode: :count
+    })
   end
 
   @impl Phoenix.LiveComponent
-  def update(%{renderable: renderable} = assigns, socket) do
+  def update(%{renderable: r} = assigns, socket) do
     {:ok,
      socket
-     |> assign(:renderable, renderable)
-     |> assign(:resolver, assigns[:resolver])
-     |> assign(:current_user, assigns[:current_user])
-     |> assign(:presenter, assigns[:presenter])}
+     |> assign(:title, r.props[:title] || "Pipeline")
+     |> assign(:rows, r.props[:rows] || [])
+     |> assign(:mode, r.props[:mode] || :count)
+     |> assign(:current_user, assigns[:current_user])}
   end
 
   @impl Phoenix.LiveComponent
-  def handle_event("set_measure", %{"mode" => mode}, socket) do
-    new_measures =
-      case mode do
-        "count" -> ["count(*)"]
-        "value" -> ["sum(value)"]
-        _ -> nil
+  def handle_event("set_measure", %{"mode" => mode_str}, socket) do
+    mode =
+      case mode_str do
+        "value" -> :value
+        _ -> :count
       end
 
-    if is_nil(new_measures) or is_nil(socket.assigns[:resolver]) do
-      {:noreply,
-       assign(socket,
-         refine_error: "Refine only works inside Live.Report with a resolver in context."
-       )}
-    else
-      context = build_context(socket)
-
-      case Resonance.refine(
-             socket.assigns.renderable,
-             fn intent -> %{intent | measures: new_measures} end,
-             context
-           ) do
-        {:ok, refined} ->
-          {:noreply, assign(socket, renderable: refined, refine_error: nil)}
-
-        {:error, reason} ->
-          {:noreply, assign(socket, :refine_error, format_error(reason))}
-      end
-    end
+    rows = Deals.by_stage_distribution(mode: mode)
+    {:noreply, socket |> assign(:mode, mode) |> assign(:rows, rows)}
   end
-
-  defp build_context(socket) do
-    %{
-      resolver: socket.assigns[:resolver],
-      current_user: socket.assigns[:current_user],
-      presenter: socket.assigns[:presenter]
-    }
-  end
-
-  defp format_error({:invalid_field, field, msg}), do: "Invalid #{field}: #{msg}"
-  defp format_error({:unsupported_query, dataset}), do: "Cannot funnel #{dataset}."
-  defp format_error(other), do: "Refine failed: #{inspect(other)}"
 
   @impl Phoenix.LiveComponent
   def render(assigns) do
-    assigns =
-      assigns
-      |> assign(:rows, rows(assigns.renderable))
-      |> assign(:mode, current_mode(assigns.renderable))
-      |> then(fn a -> assign(a, :max, max_value(a.rows)) end)
+    assigns = assign(assigns, :max, max_value(assigns.rows))
 
     ~H"""
     <div class="resonance-component resonance-widget pipeline-funnel rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div class="flex items-baseline justify-between mb-4">
-        <h3 class="text-base font-semibold text-gray-900">{@renderable.props[:title] || "Pipeline"}</h3>
+        <h3 class="text-base font-semibold text-gray-900">{@title}</h3>
         <span class="text-xs uppercase tracking-wide text-gray-400">Interactive</span>
       </div>
 
@@ -186,10 +120,6 @@ defmodule ResonanceDemoWeb.Widgets.PipelineFunnel do
         </button>
       </div>
 
-      <div :if={@refine_error} class="mb-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800">
-        {@refine_error}
-      </div>
-
       <div class="space-y-1.5">
         <%= for row <- @rows do %>
           <div class="flex items-center gap-3">
@@ -210,10 +140,6 @@ defmodule ResonanceDemoWeb.Widgets.PipelineFunnel do
       </div>
     </div>
     """
-  end
-
-  defp rows(%Resonance.Renderable{props: props}) do
-    props[:data] || props["data"] || []
   end
 
   defp row_label(row), do: row[:label] || row["label"] || "—"
@@ -239,19 +165,6 @@ defmodule ResonanceDemoWeb.Widgets.PipelineFunnel do
       _ -> 0
     end
   end
-
-  defp current_mode(%Resonance.Renderable{
-         result: %Resonance.Result{intent: %Resonance.QueryIntent{measures: measures}}
-       })
-       when is_list(measures) do
-    cond do
-      Enum.any?(measures, &String.contains?(&1, "sum(value)")) -> :value
-      Enum.any?(measures, &String.contains?(&1, "avg(value)")) -> :value
-      true -> :count
-    end
-  end
-
-  defp current_mode(_), do: :count
 
   defp format_metric(n, :value) when is_number(n) and n >= 1_000_000,
     do: "$#{Float.round(n / 1_000_000, 1)}M"

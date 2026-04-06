@@ -39,6 +39,18 @@ defmodule Resonance.WidgetTest do
       }
     end
 
+    @impl Resonance.Widget
+    def playground_renderable(widget_assigns) do
+      %Renderable{
+        id: "live-from-context",
+        type: "comparison",
+        component: __MODULE__,
+        props: %{title: "Live", from: widget_assigns[:source]},
+        status: :ready,
+        render_via: :live
+      }
+    end
+
     @impl Phoenix.LiveComponent
     def update(assigns, socket), do: {:ok, Phoenix.Component.assign(socket, assigns)}
 
@@ -90,6 +102,20 @@ defmodule Resonance.WidgetTest do
     test "returns {:ok, renderable} when implemented" do
       assert {:ok, %Renderable{id: "example", type: "comparison"}} =
                Widget.example_renderable(FullWidget)
+    end
+  end
+
+  describe "playground_renderable/2" do
+    test "returns :not_implemented when the optional callback is not defined" do
+      assert Widget.playground_renderable(MinimalWidget, %{}) == :not_implemented
+    end
+
+    test "returns {:ok, renderable} from the widget's callback, passing widget_assigns" do
+      assert {:ok, %Renderable{id: "live-from-context"} = r} =
+               Widget.playground_renderable(FullWidget, %{source: "tests"})
+
+      assert r.props.from == "tests"
+      assert r.render_via == :live
     end
   end
 

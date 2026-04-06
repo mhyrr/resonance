@@ -1,20 +1,29 @@
 defmodule Resonance.Renderable do
   @moduledoc """
-  A resolved, renderable component ready for LiveView display.
+  A composed UI component ready to mount.
 
-  Produced by a primitive's `present/2` callback after data resolution.
-  The Composer collects these and the LiveView component renders them.
+  Produced by a `Resonance.Presenter` from a `Resonance.Result`. Carries
+  everything `Resonance.Live.Report` needs to mount the component plus the
+  initial assigns the component should be mounted with.
 
   ## `render_via`
 
-  - `:function` (default) — the `component` is a `Resonance.Component`
-    function component. `Live.Report` invokes its `render/1` directly.
-  - `:live` — the `component` is a `Resonance.Widget` LiveComponent.
-    `Live.Report` mounts it via `<.live_component>` and routes streaming
-    updates through `Phoenix.LiveView.send_update/2`.
+  - `:function` (default) — `component` is a `Resonance.Component` function
+    component. `Live.Report` invokes its `render/1` directly.
+  - `:live` — `component` is a `Resonance.Widget` LiveComponent. `Live.Report`
+    mounts it via `<.live_component>`.
 
-  Presenters set `render_via` when building the Renderable, typically by
-  calling `ready_live/3` instead of `ready/3`.
+  Presenters set `render_via` by calling `ready/3` (function components) or
+  `ready_live/3` (widgets).
+
+  ## `result` (introspection only)
+
+  The underlying `Resonance.Result` that produced this Renderable is kept on
+  the struct as a paper trail for **developer introspection** — for example,
+  inspecting it from IEx while debugging a custom resolver. **Widgets must
+  not read it at runtime**: their contract is "receive `:renderable`, work
+  with `:props`." Reading `:result` from a widget is going off the documented
+  contract and will couple the widget to internals that may change.
   """
 
   @type render_via :: :function | :live
@@ -27,11 +36,10 @@ defmodule Resonance.Renderable do
           status: :ready | :error | :loading,
           error: term() | nil,
           render_via: render_via(),
-          result: Resonance.Result.t() | nil,
-          primitive: String.t() | nil
+          result: Resonance.Result.t() | nil
         }
 
-  @derive {Jason.Encoder, only: [:id, :type, :props, :status, :render_via, :result, :primitive]}
+  @derive {Jason.Encoder, only: [:id, :type, :props, :status, :render_via]}
   @enforce_keys [:id, :type, :component, :status]
   defstruct [
     :id,
@@ -41,7 +49,6 @@ defmodule Resonance.Renderable do
     :status,
     :error,
     :result,
-    :primitive,
     render_via: :function
   ]
 
@@ -61,12 +68,14 @@ defmodule Resonance.Renderable do
   end
 
   @doc """
-  Build a ready-to-render Renderable backed by a LiveComponent widget
-  (`Resonance.Widget`).
+  Build a ready-to-render Renderable backed by a `Resonance.Widget`
+  LiveComponent.
 
   Use this from a Presenter when you want the component to be interactive.
-  `Live.Report` will mount it via `<.live_component>` and deliver subsequent
-  updates with `Phoenix.LiveView.send_update/2`.
+  `Live.Report` will mount it via `<.live_component>`. Once mounted, the
+  widget is a normal Phoenix LiveComponent — it calls your app contexts
+  from `handle_event/3`, subscribes to PubSub, etc. Resonance is no longer
+  in the runtime path.
   """
   def ready_live(type, widget, props) do
     %__MODULE__{

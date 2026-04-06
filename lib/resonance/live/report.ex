@@ -53,6 +53,7 @@ defmodule Resonance.Live.Report do
     |> assign_new(:resolver, fn -> assigns[:resolver] end)
     |> assign_new(:current_user, fn -> assigns[:current_user] end)
     |> assign_new(:presenter, fn -> assigns[:presenter] end)
+    |> assign_new(:widget_assigns, fn -> assigns[:widget_assigns] || %{} end)
     |> assign_new(:components, fn -> [] end)
     |> assign_new(:loading, fn -> false end)
     |> assign_new(:prompt, fn -> "" end)
@@ -142,7 +143,7 @@ defmodule Resonance.Live.Report do
 
   defp handle_refresh(socket, _assigns), do: socket
 
-  # Allow resolver and presenter to be updated from parent assigns.
+  # Allow resolver, presenter, and widget_assigns to be updated from parent.
   defp handle_assign_updates(socket, assigns) do
     socket
     |> then(fn s ->
@@ -150,6 +151,9 @@ defmodule Resonance.Live.Report do
     end)
     |> then(fn s ->
       if assigns[:presenter], do: assign(s, :presenter, assigns.presenter), else: s
+    end)
+    |> then(fn s ->
+      if assigns[:widget_assigns], do: assign(s, :widget_assigns, assigns.widget_assigns), else: s
     end)
   end
 
@@ -315,9 +319,7 @@ defmodule Resonance.Live.Report do
                 module={component.component}
                 id={component.id}
                 renderable={component}
-                resolver={@resolver}
-                current_user={@current_user}
-                presenter={@presenter}
+                {@widget_assigns}
               />
             <% else %>
               {render_component(component)}

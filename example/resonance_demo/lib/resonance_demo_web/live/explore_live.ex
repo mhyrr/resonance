@@ -1,9 +1,7 @@
 defmodule ResonanceDemoWeb.ExploreLive do
   use ResonanceDemoWeb, :live_view
 
-  import Ecto.Query
-  alias ResonanceDemo.Repo
-  alias ResonanceDemo.CRM.{Company, Deal}
+  alias ResonanceDemo.Deals
 
   @suggestions [
     "Show me deal pipeline by stage",
@@ -14,10 +12,6 @@ defmodule ResonanceDemoWeb.ExploreLive do
     "What does our contact funnel look like from lead to customer?",
     "Give me a full pipeline review with trends and top accounts"
   ]
-
-  @stages ~w(prospecting discovery proposal negotiation closed_won closed_lost)
-  @owners ~w(Alice Bob Carol Dave)
-  @quarters ~w(2025-Q1 2025-Q2 2025-Q3 2025-Q4 2026-Q1 2026-Q2)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -32,34 +26,14 @@ defmodule ResonanceDemoWeb.ExploreLive do
 
   @impl true
   def handle_event("simulate_deals", _params, socket) do
-    company_ids = Repo.all(from c in Company, select: c.id)
-    count = Enum.random(5..12)
-    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+    {:ok, message} = Deals.simulate_batch()
 
-    deals =
-      for _i <- 1..count do
-        %{
-          name: "New Deal ##{System.unique_integer([:positive, :monotonic])}",
-          value: Enum.random(10..500) * 1000,
-          stage: Enum.random(@stages),
-          close_date: Date.add(Date.utc_today(), Enum.random(-90..180)),
-          owner: Enum.random(@owners),
-          quarter: Enum.random(@quarters),
-          company_id: Enum.random(company_ids),
-          inserted_at: now,
-          updated_at: now
-        }
-      end
-
-    {inserted, _} = Repo.insert_all(Deal, deals)
-    total_value = deals |> Enum.map(& &1.value) |> Enum.sum()
-
-    socket = assign(socket, data_flash: "Added #{inserted} deals worth $#{format_value(total_value)}")
-
-    # Re-resolve the current report against fresh data (no LLM re-call)
+    # Re-run the same LLM tool calls against fresh data for any non-interactive
+    # widgets. Widgets that subscribed to the "deals" PubSub topic already
+    # updated themselves via the broadcast inside Deals.simulate_batch/0.
     send_update(Resonance.Live.Report, id: "explore-report", refresh: true)
 
-    {:noreply, socket}
+    {:noreply, assign(socket, data_flash: message)}
   end
 
   @impl true
@@ -99,6 +73,7 @@ defmodule ResonanceDemoWeb.ExploreLive do
         id="explore-report"
         resolver={ResonanceDemo.CRM.Resolver}
         presenter={ResonanceDemoWeb.Presenters.Interactive}
+        widget_assigns={%{current_user: nil}}
       />
 
       <div class="mt-12 text-center text-gray-400">
@@ -118,7 +93,4 @@ defmodule ResonanceDemoWeb.ExploreLive do
     """
   end
 
-  defp format_value(n) when n >= 1_000_000, do: "#{Float.round(n / 1_000_000, 1)}M"
-  defp format_value(n) when n >= 1_000, do: "#{Float.round(n / 1_000, 1)}K"
-  defp format_value(n), do: Integer.to_string(n)
 end

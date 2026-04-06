@@ -77,31 +77,6 @@ defmodule Resonance.Primitive do
     end
   end
 
-  @doc """
-  Re-resolve a primitive starting from an existing `QueryIntent`.
-
-  Used by `Resonance.refine/3` when a widget mutates its current intent and
-  wants fresh data from the resolver. Skips the params -> QueryIntent build
-  step (the intent is already structured) but still runs validation and
-  preserves the title.
-  """
-  def resolve_with_intent(kind, %Resonance.QueryIntent{} = intent, title, context) do
-    resolver = context[:resolver] || context["resolver"]
-
-    with {:ok, validated} <- Resonance.QueryIntent.validate(intent),
-         :ok <- validate_if_implemented(resolver, validated, context),
-         {:ok, data} <- resolver.resolve(validated, context) do
-      {:ok,
-       %Resonance.Result{
-         kind: kind,
-         title: title,
-         data: data,
-         intent: validated,
-         summary: Resonance.Result.compute_summary(data)
-       }}
-    end
-  end
-
   defp validate_if_implemented(resolver, intent, context) do
     if function_exported?(resolver, :validate, 2),
       do: resolver.validate(intent, context),

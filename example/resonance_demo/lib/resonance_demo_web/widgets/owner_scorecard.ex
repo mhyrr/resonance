@@ -2,16 +2,16 @@ defmodule ResonanceDemoWeb.Widgets.OwnerScorecard do
   @moduledoc """
   Interactive sales-rep scorecard.
 
-  Renders a `:segmentation` Result (deals grouped by owner) as a row of
-  per-rep cards and lets the user scope the data to a specific quarter
-  without an LLM round-trip.
+  Renders a `:segmentation` Result (deals grouped by owner) and lets the
+  user scope the view to a specific quarter via chip filters. Quarter
+  selection calls `Deals.by_owner/1` directly.
 
-  The interaction is a `Resonance.refine/3` call that adds (or removes) a
-  `quarter = ...` filter on the existing `QueryIntent` — same dataset, same
-  dimensions, just narrowed.
+  Subscribes to the `"deals"` PubSub topic for live updates.
   """
 
   use Resonance.Widget
+
+  alias ResonanceDemo.Deals
 
   @quarters ~w(2025-Q1 2025-Q2 2025-Q3 2025-Q4 2026-Q1 2026-Q2)
 
@@ -19,39 +19,7 @@ defmodule ResonanceDemoWeb.Widgets.OwnerScorecard do
   def accepts_results, do: [:segmentation]
 
   @impl Resonance.Widget
-  def capabilities, do: [:refine]
-
-  @impl Resonance.Widget
-  def live_renderable(context) do
-    intent = %Resonance.QueryIntent{
-      dataset: "deals",
-      measures: ["sum(value)"],
-      dimensions: ["owner"]
-    }
-
-    case Resonance.Primitive.resolve_with_intent(
-           :segmentation,
-           intent,
-           "Reps by pipeline value",
-           context
-         ) do
-      {:ok, %Resonance.Result{} = result} ->
-        {:ok,
-         %Resonance.Renderable{
-           id: "live-owner-scorecard",
-           type: "segment_population",
-           component: __MODULE__,
-           props: %{title: result.title, data: result.data},
-           status: :ready,
-           render_via: :live,
-           primitive: "segment_population",
-           result: result
-         }}
-
-      {:error, _} = error ->
-        error
-    end
-  end
+  def capabilities, do: [:filter, :live_updates]
 
   @impl Resonance.Widget
   def example_renderable do
@@ -68,117 +36,57 @@ defmodule ResonanceDemoWeb.Widgets.OwnerScorecard do
       component: __MODULE__,
       status: :ready,
       render_via: :live,
-      primitive: "segment_population",
-      props: %{title: "Reps by pipeline value (example)", data: rows},
-      result: %Resonance.Result{
-        kind: :segmentation,
+      props: %{
         title: "Reps by pipeline value (example)",
-        data: rows,
-        intent: %Resonance.QueryIntent{
-          dataset: "deals",
-          measures: ["sum(value)"],
-          dimensions: ["owner"],
-          filters: nil
-        }
+        rows: rows,
+        active_quarter: nil
       }
     }
   end
 
+  @impl Resonance.Widget
+  def playground_renderable(_widget_assigns) do
+    rows = Deals.by_owner()
+
+    Resonance.Renderable.ready_live("segment_population", __MODULE__, %{
+      title: "Reps by pipeline value",
+      rows: rows,
+      active_quarter: nil
+    })
+  end
+
   @impl Phoenix.LiveComponent
   def mount(socket) do
-    {:ok, assign(socket, quarters: @quarters, refine_error: nil, active_quarter: nil)}
+    {:ok, assign(socket, quarters: @quarters)}
   end
 
   @impl Phoenix.LiveComponent
-  def update(%{renderable: renderable} = assigns, socket) do
+  def update(%{renderable: r} = assigns, socket) do
     {:ok,
      socket
-     |> assign(:renderable, renderable)
-     |> assign(:resolver, assigns[:resolver])
-     |> assign(:current_user, assigns[:current_user])
-     |> assign(:presenter, assigns[:presenter])
-     |> assign_active_quarter_from_intent(renderable)}
+     |> assign(:title, r.props[:title] || "Reps")
+     |> assign(:rows, r.props[:rows] || [])
+     |> assign(:active_quarter, r.props[:active_quarter])
+     |> assign(:current_user, assigns[:current_user])}
   end
-
-  defp assign_active_quarter_from_intent(socket, %Resonance.Renderable{
-         result: %Resonance.Result{intent: %Resonance.QueryIntent{filters: filters}}
-       }) do
-    quarter =
-      case filters do
-        list when is_list(list) ->
-          case Enum.find(list, fn f -> f.field == "quarter" end) do
-            %{value: q} -> q
-            _ -> nil
-          end
-
-        _ ->
-          nil
-      end
-
-    assign(socket, :active_quarter, quarter)
-  end
-
-  defp assign_active_quarter_from_intent(socket, _), do: assign(socket, :active_quarter, nil)
 
   @impl Phoenix.LiveComponent
   def handle_event("set_quarter", %{"quarter" => quarter}, socket) do
-    refine_with(socket, fn intent ->
-      filters = drop_quarter(intent.filters) ++ [%{field: "quarter", op: "=", value: quarter}]
-      %{intent | filters: filters}
-    end)
+    rows = Deals.by_owner(quarter: quarter)
+    {:noreply, socket |> assign(:active_quarter, quarter) |> assign(:rows, rows)}
   end
 
   def handle_event("clear_quarter", _params, socket) do
-    refine_with(socket, fn intent ->
-      case drop_quarter(intent.filters) do
-        [] -> %{intent | filters: nil}
-        rest -> %{intent | filters: rest}
-      end
-    end)
+    rows = Deals.by_owner()
+    {:noreply, socket |> assign(:active_quarter, nil) |> assign(:rows, rows)}
   end
-
-  defp refine_with(socket, intent_fn) do
-    if is_nil(socket.assigns[:resolver]) do
-      {:noreply,
-       assign(socket,
-         refine_error: "Filter only works inside Live.Report with a resolver in context."
-       )}
-    else
-      context = %{
-        resolver: socket.assigns[:resolver],
-        current_user: socket.assigns[:current_user],
-        presenter: socket.assigns[:presenter]
-      }
-
-      case Resonance.refine(socket.assigns.renderable, intent_fn, context) do
-        {:ok, refined} ->
-          {:noreply,
-           socket
-           |> assign(:renderable, refined)
-           |> assign(:refine_error, nil)
-           |> assign_active_quarter_from_intent(refined)}
-
-        {:error, reason} ->
-          {:noreply, assign(socket, :refine_error, format_error(reason))}
-      end
-    end
-  end
-
-  defp drop_quarter(nil), do: []
-  defp drop_quarter(filters), do: Enum.reject(filters, fn f -> f.field == "quarter" end)
-
-  defp format_error({:invalid_field, field, msg}), do: "Invalid #{field}: #{msg}"
-  defp format_error({:unsupported_query, dataset}), do: "Cannot scope #{dataset}."
-  defp format_error(other), do: "Refine failed: #{inspect(other)}"
 
   @impl Phoenix.LiveComponent
   def render(assigns) do
-    assigns = assign(assigns, :rows, rows(assigns.renderable))
-
     ~H"""
     <div class="resonance-component resonance-widget owner-scorecard rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div class="flex items-baseline justify-between mb-4">
-        <h3 class="text-base font-semibold text-gray-900">{@renderable.props[:title] || "Reps"}</h3>
+        <h3 class="text-base font-semibold text-gray-900">{@title}</h3>
         <span class="text-xs uppercase tracking-wide text-gray-400">Interactive</span>
       </div>
 
@@ -217,10 +125,6 @@ defmodule ResonanceDemoWeb.Widgets.OwnerScorecard do
         <% end %>
       </div>
 
-      <div :if={@refine_error} class="mb-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800">
-        {@refine_error}
-      </div>
-
       <div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
         <%= for row <- @rows do %>
           <div class="rounded-lg border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4">
@@ -240,10 +144,6 @@ defmodule ResonanceDemoWeb.Widgets.OwnerScorecard do
       </div>
     </div>
     """
-  end
-
-  defp rows(%Resonance.Renderable{props: props}) do
-    props[:data] || props["data"] || []
   end
 
   defp row_label(row), do: row[:label] || row["label"] || "—"
