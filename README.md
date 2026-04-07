@@ -2,11 +2,11 @@
 
 **Generative analysis surfaces for Phoenix LiveView.**
 
-An Elixir library that lets users ask questions about application data and receive composed, app-native UI (reports, dashboards, contextual insights) built from semantic primitives and streamed in real-time via LiveView.
+An Elixir library that lets users ask questions about application data and receive composed, app-native UI built from semantic primitives and streamed via LiveView.
 
-> **Guiding line:** *Resonance lets the user's question pick from the developer's design system.*
+> *Resonance lets the user's question pick from the developer's design system.*
 >
-> The LLM doesn't invent UI. The developer brings the look, the components, and the data; Resonance is the runtime that lets a user's natural-language question compose those into a view, at query time, live.
+> The developer defines the look, components, and data; Resonance is the runtime that lets a user's natural-language question compose those into a new view at query time. Models are smart enough to know what a user wants, they just need the right context from the developer to build it.
 
 ![Resonance widget playground rendering an interactive TrendSparkline against live CRM data](docs/images/playground-hero.png)
 
@@ -26,7 +26,7 @@ A Presenter maps the resolved data to UI components
 LiveView streams components progressively as they resolve
 ```
 
-The LLM does not generate UI. It selects semantic operations over your data. Resonance resolves those operations, your Presenter maps them to components, and the result streams to the browser.
+The LLM does not generate UI directly. It selects semantic operations over your data. Resonance resolves those operations, your Presenter maps them to components, and the result streams to the browser.
 
 ## Quick Start
 
@@ -59,7 +59,7 @@ Drop the component into any LiveView:
 />
 ```
 
-You need two things: a **Resolver** (your data layer) and a **presentation setup** (chart library + optional custom Presenter).
+You need two things: a **Resolver** (data layer) and a **presentation setup** (chart library + optional custom Presenter).
 
 ## Writing a Resolver
 
@@ -104,7 +104,7 @@ This is critical. The string you return becomes part of the LLM's system prompt.
 
 ### The `validate/2` callback
 
-The security boundary. Check that the dataset is allowed, the user has permission, and the query makes sense. Return `:ok` or `{:error, reason}`. Optional — if not implemented, validation is skipped.
+Security boundary to check that the dataset is allowed, the user has permission, and the query makes sense. Return `:ok` or `{:error, reason}`. Optional — if not implemented, validation is skipped.
 
 ### The `resolve/2` callback
 
@@ -155,7 +155,7 @@ The resolver returns flat rows. The Presenter and chart hooks handle structuring
 
 ## Presentation
 
-Resonance separates semantic truth from visual rendering. Primitives produce a `Result` (what the data says). A `Presenter` maps it to a `Renderable` (how it looks). You control the Presenter.
+Primitives produce a `Result` (what the data says). A `Presenter` maps it to a `Renderable` (how it looks). You control the Presenter.
 
 ### Architecture
 
@@ -402,35 +402,39 @@ mix format            # Format code
 
 ### Beyond the Fixed Dashboard
 
-Software teams have always built UI the same way: study the users, guess what they need, build it in a lab, ship it, and hope. The result is dashboards and reports that are roughly 80% correct for roughly 80% of people. The other 20% file tickets, build spreadsheets, or learn to live without the view they actually needed.
+Software teams build the 80% case: 80% correct for roughly 80% of people. The other 20% file tickets, build spreadsheets, or learn to live without the view they actually needed.
 
-That model is ending. When a language model can interpret a user's intent and map it to structured operations over real data, the economics change. Instead of a product team anticipating every possible view and pre-building it, the user states what they want and the system composes it on demand. The view that answers "which donors lapsed this quarter and why" doesn't need to exist as a page in your app. It can be generated from the question itself, against real data, in real time.
+But a language model can interpret a user's intent and map it to structured operations over real data. Instead of a product team anticipating every possible view and pre-building it, the user states what they want and the system composes it on demand. A view that answers "which customers lapsed this quarter and why" doesn't need to exist as a page in your app. It can be generated from the question itself against real data in real time.
 
-Nobody wants to have a conversation with their CRM. The output is a composed analytical surface (charts, tables, metrics, narrative) that looks and behaves like a page your team built. It just happens to be one nobody planned for.
+Nobody wants to have an unending conversation with their CRM. They want a one-shot output; a composed analytical surface (charts, tables, metrics, narrative) that looks and behaves like a page your team built, whether they planned it out or not.
 
 ### Why a Semantic Layer
 
 Vercel's AI SDK takes the direct approach: the LLM picks React components via tool calls. Ask about weather, get a `<WeatherCard>`. Ask about stocks, get a `<StockChart>`. The model selects widgets.
 
-This works for demos. It breaks down for data analysis, because it couples the model's understanding to your component library. The LLM needs to know the difference between a bar chart and a line chart, and when to use each. Change your charting library? Update your tool definitions. Add a mobile layout? Teach the model new components. The presentation layer becomes part of the prompt.
+This works for demos but it breaks down because it couples the model's understanding directly to your component library. The LLM needs to know the difference between a bar chart and a line chart, and when to use each. Change your charting library? Update your tool definitions. Add a mobile layout? Teach the model new components. The presentation layer becomes part of the prompt.
 
 Resonance inserts a semantic layer between the LLM and the UI. The model doesn't pick a bar chart. It picks `rank_entities`, an analytical operation meaning "order these things by a metric." A Presenter inspects the resolved data and chooses the right component: a horizontal bar chart for 4 items, a sortable table for 40. Same intent, different data, different presentation, and the model never had to care.
 
 You can swap chart libraries without touching the LLM integration. You can add device-specific rendering without rewriting tool schemas. You can change how "show distribution" looks without changing what it means. The model operates on stable analytical concepts; the UI is free to evolve independently.
 
-### Why Elixir
+### Riding on Phoenix LiveView
 
-Generative UI has a pipeline problem. A user's question becomes an LLM call, which becomes tool selections, which become data queries, which become resolved components, which become rendered HTML. In most architectures, this pipeline crosses multiple process boundaries.
+Resonance is a thin layer over Phoenix primitives, not a parallel universe. The composition engine, the streaming, the interactive widgets — all of it is the things Phoenix already does well, arranged in service of generative UI.
 
-LiveView eliminates most of that. The LLM's tool call output, the data resolution, the component rendering, and the DOM update all happen in a single server process. Components stream to the browser as WebSocket DOM diffs. Each primitive resolves independently and appears the moment it's ready.
+- **`Task.Supervisor.async_stream`** runs primitives in parallel. Each primitive resolves in its own supervised, unlinked task.
+- **LiveView streams** push each resolved component to the browser the moment it's ready — no waiting for the slowest query. Same WebSocket the rest of your app already uses.
+- **`Phoenix.LiveComponent`** *is* the widget contract. A `Resonance.Widget` is a LiveComponent with one extra behaviour callback. `handle_event/3` calls your contexts directly; once the widget mounts, Resonance is gone from the runtime path.
+- **`Phoenix.PubSub` + `send_update/2`** works. Subscribe in the parent LiveView, push a refreshed `:renderable` into the widget — the same pattern you'd use for any other LiveComponent.
+- **`live_session` + `on_mount`** wires to your contexts and current user, so widgets render against actual data instead of fixtures.
 
-OTP adds the structural pieces that a generative system needs. Each primitive resolves inside a supervised task; if one fails, the others still render. The composition engine uses `Task.async_stream` with backpressure and timeouts. These are properties of the runtime, not features bolted onto a web framework.
+Resonance composes the question into a starting page. From there, everything is Phoenix — same lifecycle, same patterns, same debugging tools your team already knows.
 
 ## Interactive widgets (v2)
 
 v0.1 is read-only generated reports. v0.2 adds a small contract on top of LiveView so the same composed report can be **interactive**.
 
-**The principle:** Resonance composes the page from the user's question; once the widget is mounted, *Resonance is gone from the runtime path.* Widgets are real Phoenix LiveComponents — they call your app contexts from `handle_event/3`, manage local state in assigns, and handle mutations the same way every other LiveComponent does. The library composes; Phoenix runs.
+Resonance composes the page from the user's question; once the widget is mounted, Resonance is gone from the runtime path. Widgets are Phoenix LiveComponents — they call your app contexts from `handle_event/3`, manage local state in assigns, and handle mutations the same way every other LiveComponent does. The library composes; Phoenix runs.
 
 A presenter can return a **`Resonance.Widget`** — a Phoenix LiveComponent that implements one extra behaviour — instead of a function component:
 
@@ -531,13 +535,17 @@ The on_mount hook drops `:widget_assigns`, optionally a `:simulate_fn` for a "re
 
 ## Where This Goes
 
-The structured `QueryIntent` is a validated, inspectable intermediate representation — a bounded AST with explicit datasets, measures, dimensions, and filters. The resolver is already a trust boundary with permission enforcement. The primitive system is extensible at runtime. The presenter layer is swappable. The widget contract bridges into the full Phoenix LiveComponent ecosystem with one extra callback. The vision: a Phoenix developer uses Resonance to generate on-the-fly real-time pages, fully interactive, with the look and feel and contracts defined entirely by their app. Resonance composes the question into a starting page; Phoenix runs everything from there.
+The structured `QueryIntent` is an intermediate representation AST with explicit datasets, measures, dimensions, and filters. The resolver is already a trust boundary with permission enforcement. The primitive system is extensible at runtime. The presenter layer is swappable. The widget contract bridges into the full Phoenix LiveComponent ecosystem with one extra callback. The vision: a Phoenix developer uses Resonance to generate on-the-fly real-time pages, fully interactive, with the look and feel and contracts defined entirely by their app. Resonance composes the question into a starting page; Phoenix runs everything from there.
 
 ## Why "Resonance"?
 
-From the Thomistic concept *resonantia*, which describes what happens when a living knower's inquiry activates structured knowledge, producing insight neither party contained independently.
+> *Cognitum est in cognoscente per modum cognoscentis.*
+> "The thing known exists in the knower according to the mode of the knower."
+> — Thomas Aquinas
 
-The LLM holds compressed patterns about data analysis and user intent. Your app holds the actual data and domain logic. Neither produces the right view alone. When the user's question passes through the LLM and activates the right primitives against real data, something emerges that was not in either system: a composed surface that answers a question nobody pre-built a report for.
+What happens when an inquiry activates structured knowledge and produces insight? Let's say it resonates.
+
+The LLM holds compressed patterns about data analysis and user intent — knowledge in *its* mode. Your app holds the actual data and domain logic — knowledge in *its* mode. Neither produces the right view alone. When the user's question passes through the LLM and activates the right primitives against real data, something emerges that was not in either system: a composed surface that answers a question nobody pre-built a report for.
 
 ## License
 
