@@ -8,6 +8,10 @@ An Elixir library that lets users ask questions about application data and recei
 >
 > The LLM doesn't invent UI. The developer brings the look, the components, and the data; Resonance is the runtime that lets a user's natural-language question compose those into a view, at query time, live.
 
+![Resonance widget playground rendering an interactive TrendSparkline against live CRM data](docs/images/playground-hero.png)
+
+*The widget playground — every `Resonance.Widget` your app provides, enumerated and rendered against real data through your own contexts. Filter chips, refresh, and live PubSub-driven updates all work the way Phoenix LiveComponents already do; Resonance just composed the page.*
+
 ## How It Works
 
 ```
