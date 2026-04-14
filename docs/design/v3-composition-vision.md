@@ -1,391 +1,628 @@
-# Resonance v3 (vision): The application as a vocabulary
+# Resonance v3 (vision): Adaptive Workspaces
 
 > **Status: exploratory.** This is a thinking document, not a build plan. It
-> records a direction we're interested in and the reasoning that got us there.
-> Parts of it will probably be wrong. We commit to running a few small
-> experiments before committing to any of it.
+> records a direction we want to pressure-test. Parts of it will be wrong. We
+> are explicitly not committing to implementation until a few cheap experiments
+> tell us whether the core thesis survives contact with reality.
 
 ## The north star
 
-Imagine a CRM with **zero pre-built pages**. A user opens the app, types or
-speaks what they want to see, and the view materializes — composed in real
-time from the developer's own component library, bound to real data, fully
-interactive. The user asks for something else; a different view appears.
-They want to create a new deal; a form is composed on the fly from the
-developer's form components, bound to the developer's own create action.
-They never see a page a developer pre-built, because no page was pre-built.
+Imagine a CRM with **zero pre-built pages**.
 
-The developer didn't anticipate any of this. They built a design system
-(cards, list rows, metric tiles, form fields, buttons — the normal
-vocabulary of their app) and they wired up data access and mutations. That's
-it. Every view the user asks for is composed at query time, from that
-vocabulary, against that data.
+A user opens the app, types or speaks what they want to see, and a workspace
+materializes in real time. It is bound to real data. It is interactive. It is
+composed from the developer's own product vocabulary. The user asks for
+something else; a different workspace appears. They want to create a new deal;
+the system composes the right action surface for that too, using the
+developer's own rules and handlers.
 
-## The guiding line
+No one page was pre-built for that moment. The developer did not have to
+anticipate the exact view. They built a system of capabilities, presentation
+patterns, and product primitives. Resonance turned the user's intent into a
+working surface.
 
-> **Resonance lets the user's question pick from the developer's design
-> system.**
+That is the north star.
 
-If this sentence is true, we're interesting. If it's false or we can't make
-it true, we're a slow LLM router.
+## The line we want to make true
 
-## Why now — the intelligence overhang
+> **Resonance lets a user's intent project a workspace from the application's
+> capabilities.**
 
-The models are already smart enough to do this. That's the bet. The gap
-between "LLM that can compose a design system into a view" and "LLM in
-production" is not a capability gap — it's a **context gap**. What the model
-needs to do this well:
+If that sentence becomes true, Resonance is interesting. If it does not, we are
+still in the world of "LLM routes you to a prettier dashboard."
 
-1. **The user's question**, in the user's own framing.
-2. **A structured vocabulary** describing what the developer's design system
-   contains: atoms, their props, their expected nesting, their role.
-3. **A structured data layer** describing what's queryable and what isn't.
-4. **An action layer** describing what mutations are available and with
-   what shapes.
-5. **A validator and feedback loop** so malformed compositions get rejected
-   and retried instead of rendered as garbage.
+## Why this document replaces the earlier framing
 
-All five of those are context-engineering problems, not intelligence
-problems. The overhang is that we haven't built the plumbing yet — not that
-the models can't see.
+An earlier v3 framing described the application as a **vocabulary** and leaned
+heavily on the idea that the LLM would compose from the developer's design
+system directly.
+
+That framing was directionally right, but too renderer-centric.
+
+It makes the leap from v2 sound like this:
+
+- v2: the model picks semantic results, the app renders them
+- v3: the model picks UI atoms, the app renders them
+
+That is too abrupt, and probably not the right abstraction boundary.
+
+If we jump straight from "generated reports" to "runtime atom composition," we
+skip the missing middle:
+
+- a first-class model of a generated **workspace**
+- a planner that understands **roles**, not just components
+- a durable identity for generated views that can be revisited and refined
+- a contract for what the app can **know**, **show**, and **do**
+
+So this rewrite changes the center of gravity.
+
+The design system still matters, but it is not the primary abstraction.
+**Adaptive workspaces** are the primary abstraction. The design system is the
+renderer layer underneath them.
+
+## The philosophical claim
+
+Today's business software is mostly a set of frozen answers to anticipated
+questions.
+
+Pages, dashboards, and CRUD screens exist because someone guessed in advance
+what users would need often enough to justify building a view around it. That
+works tolerably well for common cases. It fails at the edge, where a user's
+actual need is narrow, contextual, fleeting, or simply not frequent enough to
+win roadmap priority.
+
+The philosophical claim behind Resonance is not:
+
+> "An LLM can generate UI faster than a human can."
+
+That is true sometimes, but it is not the interesting part.
+
+The stronger claim is:
+
+> **UI should stop being a fixed set of pages and start being a system that can
+> materialize the right workspace for the user's actual problem in the moment
+> they have it.**
+
+That is a different theory of interface design.
+
+Pages are precomputed affordances.
+Workspaces are projected affordances.
+
+If that theory is right, a good product is less like a set of screens and more
+like a capability field that can be shaped into many valid working surfaces.
+
+## What developers actually author
+
+If this vision is right, developers do not stop authoring UI. They stop
+authoring **pages as the primary unit**.
+
+What they author instead:
+
+- **Data capabilities**
+  What the system can query, aggregate, compare, and explain.
+
+- **Action capabilities**
+  What the user is allowed to do, with developer-owned validation and handlers.
+
+- **Interaction patterns**
+  The stable product shapes that are worth teaching the system: review queue,
+  detail panel, metric strip, activity feed, action form, comparison panel,
+  and so on.
+
+- **Render kit**
+  The actual Phoenix components, widgets, slots, styling rules, and interaction
+  semantics that make the product feel like itself.
+
+- **Guardrails**
+  Validation rules, trust boundaries, accessibility expectations, and layout
+  constraints.
+
+So the authored system gets smaller in one sense and richer in another.
+
+The developer no longer writes every surface the user might need. They write
+the **field of valid surfaces** the product knows how to produce.
 
 ## The honest worry
 
-The worry that's worth naming before going further:
+The worry worth naming early:
 
-> "A design system already lets a human developer build any view in 20
-> minutes. Swapping in an LLM at runtime produces the same output with worse
-> latency. We've moved labor, not enabled anything new."
+> "A design system already lets a human developer build any view in 20 minutes.
+> Swapping in an LLM at runtime produces the same artifact with worse latency.
+> We have moved labor, not changed the product."
 
-The version of this that's just moving labor is real and we shouldn't
-confuse it with the novel thing. "LLM substituted for developer, same
-artifacts" is a productivity win at best and a slow dashboard tool at worst.
-It is not v3.
+That worry is real.
 
-## The version that might be novel
+There is a fake version of this vision that is exactly that: a slow,
+non-deterministic substitute for a frontend engineer. That version is not
+interesting enough to justify itself.
 
-The shift that makes this something other than "non-deterministic developer"
-is a shift in **when and from whom** views get constructed:
+So the question is not whether the model can compose something plausible.
+The question is whether query-time composition changes the **economics and
+shape** of the product.
 
-- **Today (developer at build-time):** views are shaped by the developer's
-  imagined model of what users need. They're anchored to the data shape
-  ("we have a deals table — let's build a deals dashboard"). Building is
-  expensive, so the view set is small and fixed.
-- **v3 (LLM at query-time):** views are shaped by the user's *actual*
-  framing of their *actual* problem at the moment they're having it.
-  They're anchored to the question, not the data. Building is effectively
-  free, so the view set is unbounded and ephemeral.
+The version that might be novel is this:
 
-The qualitative claim:
+- **Today:** views are shaped by the developer's imagined model of what users
+  usually need.
+- **Resonance:** workspaces are shaped by the user's actual framing of the
+  problem they have right now.
 
-> Most of the views a user wants don't exist in any app, and never will,
-> because no developer would prioritize building them. They live in one
-> user's head for one moment. Resonance v3 materializes them.
+If that leads to a growing set of useful, revisitable, shareable, user-shaped
+workspaces that no team would have pre-built, the thesis holds. If it does not,
+we should say so plainly.
 
-Whether this claim is true is an empirical question. But if it's true, it's
-*a different economic situation*, not a speed-up of the current one.
+## The missing middle between v2 and the north star
 
-## The test that would validate this
+v1 and v2 established important pieces:
 
-Not a 30-minute usability session — that's the wrong time horizon for
-"adaptive needs that compound over time." The right test:
+- **v1:** semantic primitives, resolver boundary, presenter boundary,
+  renderables, read-only reports
+- **v2:** interactive widgets as real LiveComponents, with Phoenix owning the
+  runtime after composition
 
-> **Give a working professional — a sales manager, a researcher, an ops
-> lead — access to a v3-powered version of an app they already use, for at
-> least a month. Watch how their usage evolves. Count:**
->
-> - Views they generate that no developer would have pre-built.
-> - Views they return to in subsequent sessions (i.e. they're not one-offs).
-> - Views they share with teammates by copying the question.
-> - Mutations they perform through composed forms rather than through
->   pre-built CRUD screens.
-> - The rate at which their questions become more sophisticated as they
->   learn what the system can do.
+Those are good foundations. But they are still fundamentally about assembling
+blocks on a page.
 
-If "adaptive needs compound over time" — if the user grows into ways of
-asking that a fixed app would have stifled — the thesis holds. If they
-quickly converge on a small set of views equivalent to what a developer
-would have built, the thesis is warmed-over routing and we should say so.
+The missing middle is a first-class model of a **generated workspace**.
 
-Over a month, even moderate compounding produces a view set no human
-developer would have shipped. Over a year, it's a different product.
+Before we jump to raw design-system composition, Resonance probably needs an
+intermediate phase with capabilities like:
 
-## The minimum novel surface
+1. **Report-level planning**
+   A generated surface should have structure beyond "a sorted list of blocks."
+   It needs sections, priorities, relationships, supporting evidence, and
+   refinement affordances.
 
-If we take the thesis seriously, Resonance needs three contracts beyond
-what v1 and v2 already provide. Each is the *smallest* version that could
-work:
+2. **Workspace identity**
+   If a user asks for "my stuck deals this quarter" and comes back tomorrow,
+   what is the identity of that workspace? Can they save it, rerun it, share
+   it, promote it, refine it?
 
-### 1. `Resonance.UIKit` — the vocabulary contract
+3. **Cross-section reasoning**
+   The summary should be about the assembled workspace, not just one primitive's
+   result. A detail pane should be related to the focus list beside it. The
+   surface needs a plan, not just a pile.
 
-The developer declares which of their function components the LLM is
-allowed to compose with, plus a description of each. This is the machine-
-readable manifest of an app's UI atoms.
+4. **Capability manifests**
+   The app needs a structured way to declare what can be queried, what actions
+   can be taken, and what interaction patterns it supports.
+
+Without that middle layer, a leap straight to raw atom trees risks being
+impressive in demos and brittle in product use.
+
+## What v3 should actually be
+
+v3 should not be "the LLM composes arbitrary atoms."
+
+v3 should be:
+
+> **A planner that turns user intent into a typed workspace plan, then compiles
+> that plan into Phoenix surfaces using the application's declared
+> capabilities, patterns, and components.**
+
+That implies three layers.
+
+### 1. Capability graph
+
+The application needs to declare not only what data exists, but what it can
+know, what it can do, and what kinds of surfaces it knows how to support.
+
+The capability graph has three branches:
+
+- **Data capabilities**
+  The existing resolver world. What datasets, measures, dimensions, filters,
+  and derived analyses are allowed.
+
+- **Action capabilities**
+  Mutations and commands the user can request, with developer-owned validation
+  and handlers.
+
+- **Interaction capabilities**
+  The high-level ways the application can present and manipulate information:
+  compare, browse, inspect, queue, review, edit, approve, triage, create,
+  enrich.
+
+The key change from the earlier draft:
+
+The planner should reason primarily over **capabilities and patterns**, not raw
+presentational atoms.
+
+### 2. `Resonance.WorkspacePlan`
+
+The missing IR is not a JSON tree of components. It is a typed plan for a
+workspace.
+
+Something like:
 
 ```elixir
-defmodule MyApp.ResonanceKit do
-  use Resonance.UIKit
-
-  expose :card,         MyAppWeb.CoreComponents, :card
-  expose :list_row,     MyAppWeb.CoreComponents, :list_row
-  expose :metric_tile,  MyAppWeb.CoreComponents, :metric
-  expose :form_field,   MyAppWeb.CoreComponents, :form_field
-  expose :deal_card,    MyAppWeb.DealComponents, :deal_card
-  # ...
-
-  @impl true
-  def describe do
-    """
-    Atoms:
-    - card: container with optional title, header_action, body slot, footer slot
-      props: %{title: string, body: children}
-    - list_row: a row in a vertical list
-      props: %{title: string, subtitle: string, trailing_value: string, on_click: action_id}
-    - metric_tile: large number with label
-      props: %{label: string, value: number | string, format: "currency" | "number" | "percent"}
-    - form_field: input field bound to a form
-      props: %{name: string, type: "text" | "number" | "date" | "select" | "currency", label: string}
-    ...
-    """
-  end
-end
+%WorkspacePlan{
+  goal: :pipeline_review,
+  title: "Pipeline review for this week",
+  layout: :overview_with_detail,
+  sections: [
+    %Section{
+      id: "summary",
+      role: :summary,
+      pattern: :metric_strip,
+      source: {:primitive, "segment_population", %{dataset: "deals", ...}}
+    },
+    %Section{
+      id: "stuck_deals",
+      role: :focus_list,
+      pattern: :entity_list,
+      source: {:primitive, "rank_entities", %{dataset: "deals", ...}},
+      interactions: [:filter, :inspect]
+    },
+    %Section{
+      id: "trend",
+      role: :supporting_context,
+      pattern: :trend_panel,
+      source: {:primitive, "compare_over_time", %{dataset: "deals", ...}}
+    }
+  ],
+  refinements: [
+    %{label: "This quarter", filter: %{field: "quarter", op: "=", value: "2026-Q2"}}
+  ],
+  identity: %{kind: :ephemeral, saveable: true}
+}
 ```
 
-`describe/0` is the thing the LLM sees. It's prose-plus-structure for now;
-we may tighten to a schema once we understand what shape the LLM composes
-well against.
+This is the crucial shift.
 
-### 2. `Resonance.Actions` — the mutation contract
+The plan expresses:
 
-Parallel to the resolver (which describes queries), a manifest of "things
-the user can do." Each action has a name, a parameter schema, a description,
-and a handler.
+- what the workspace is for
+- how it is laid out
+- what each section's role is
+- how sections relate to data and actions
+- which refinements exist
+- whether the surface has a stable identity
 
-```elixir
-defmodule MyApp.ResonanceActions do
-  use Resonance.Actions
+That is closer to the philosophical idea than a raw atom tree.
 
-  @impl true
-  def describe do
-    """
-    Actions:
-    - create_deal(name, value, stage, owner): creates a new deal
-    - log_call(contact_id, notes, date): logs a call against a contact
-    - mark_deal_won(deal_id): marks a deal as closed_won
-    """
-  end
+### 3. Pattern kit
 
-  @impl true
-  def perform("create_deal", %{"name" => n, "value" => v, "stage" => s, "owner" => o}, ctx) do
-    MyApp.Deals.create_deal(%{name: n, value: v, stage: s, owner: o, user: ctx.current_user})
-  end
+The first compositional surface should be built from **mid-level patterns**,
+not low-level atoms.
 
-  def perform("log_call", params, ctx), do: MyApp.Activities.log_call(params, ctx)
-  def perform("mark_deal_won", %{"deal_id" => id}, ctx), do: MyApp.Deals.mark_won(id, ctx)
-end
-```
+Examples:
 
-The trust boundary is the same as the resolver's: the developer-controlled
-`perform/3` decides what's allowed. The LLM can *request* any action, but
-only `perform/3` decides whether it runs.
+- `metric_strip`
+- `entity_list`
+- `comparison_panel`
+- `detail_panel`
+- `timeline`
+- `review_queue`
+- `activity_feed`
+- `action_form`
+- `context_header`
 
-### 3. Compose primitives
+These patterns are still developer-owned. They compile down to the app's actual
+components and widgets. But they give the model a better unit of reasoning than
+"card," "button," or "list_row."
 
-New semantic primitives that produce *structural* outputs rather than
-tabular data:
+This is important for four reasons:
 
-- `compose_view(tree)` — emits a nested tree of atom invocations that
-  produces a read-only composition.
-- `compose_form(schema, submit_action)` — emits a form tree bound to a
-  registered action.
+1. The model has less surface area to thrash on.
+2. The validator has stronger invariants.
+3. Visual coherence is easier to preserve.
+4. Accessibility and behavior stay concentrated in developer-authored patterns.
 
-Their `resolve/2` doesn't call the resolver. It builds a Renderable whose
-`:props` contain the tree. A new function component — `Resonance.Render.Tree`
-— walks the tree and dispatches to the developer's `UIKit.render/2` per
-node.
+### 4. Render kit
 
-### What we're NOT building
+The design system still matters. It just moves down one layer.
 
-- ❌ **LLM emitting HEEx as a string.** Security nightmare. Contract-break.
-  We never accept raw HEEx from the LLM — only structured JSON trees that
-  get walked and rendered by our code.
-- ❌ **A Resonance-shipped component library.** Resonance does not bring
-  widgets. The whole point is the developer brings the vocabulary.
-- ❌ **A generic widget marketplace.** Not our problem. If the developer
-  wants to share their UIKit across projects, that's a their-problem.
-- ❌ **Multi-step wizard runtime.** Once a composed form is mounted, it's
-  a normal Phoenix LiveView surface — state management is Phoenix's job.
-  v3 is composition, not stateful runtime semantics beyond what Phoenix
-  already handles.
-- ❌ **LLM tuning / fine-tuning.** We don't train. The context-engineering
-  bet is that current off-the-shelf models are enough.
+The render kit is the developer's actual Phoenix component vocabulary: function
+components, widgets, slots, CSS conventions, interaction details.
+
+Patterns compile to the render kit.
+
+Later, if experiments prove it useful, Resonance may support more direct
+composition from the render kit as an escape hatch. But that should not be the
+first successful version of v3.
+
+The first version should optimize for coherence and validity, not expressive
+maximalism.
+
+## Pages do not disappear; they change status
+
+The phrase "zero pre-built pages" is useful as a north-star provocation, but it
+can mislead if taken too literally.
+
+The better claim is:
+
+> **Pages stop being the only authored unit and become one possible stable form
+> of a workspace.**
+
+In a mature version of this system, there are several states a surface can move
+through:
+
+1. **Ephemeral workspace**
+   Projected from a question for a momentary need.
+
+2. **Saved workspace**
+   Kept because the user expects to return to it.
+
+3. **Shared workspace**
+   Passed to teammates because it is useful beyond one person.
+
+4. **Promoted workspace**
+   Recognized by the product team as broadly valuable and given a durable place
+   in navigation, onboarding, or operations.
+
+5. **Stabilized page**
+   A workspace that has effectively become a page because it proved worth
+   keeping around.
+
+This matters because it connects the philosophy to reality.
+
+The future world is not "no structure." It is a world where structure
+**emerges first** and is only hardened into a page when repeated use justifies
+it.
+
+That is a more plausible transition path than imagining fixed pages simply
+vanishing.
+
+## What happens to `UIKit`
+
+The earlier draft's `Resonance.UIKit` idea is still useful, but its role
+changes.
+
+Instead of being the planner's primary abstraction, it becomes one of two
+things:
+
+1. **The implementation layer behind the pattern kit**
+   The app still exposes its components and descriptions, but Resonance uses
+   them mainly to render known patterns.
+
+2. **A later-stage escape hatch**
+   Once the planner and validator are proven, a developer can choose to expose
+   a smaller atom-level vocabulary for freer composition where it makes sense.
+
+So `UIKit` stays as a good idea, but not as the center of v3.
+
+## What happens to `Actions`
+
+The earlier draft's `Resonance.Actions` idea survives almost unchanged.
+
+That part is sound:
+
+- the app declares what actions exist
+- the app declares the parameter shapes
+- the app owns the trust boundary in `perform/3`
+
+The change is sequencing.
+
+I would not make action composition the first proof of v3. Read-only and
+refine-only workspaces are the safer proving ground. Once the workspace planner
+is credible, then composed forms and action surfaces become a meaningful next
+step rather than an extra axis of uncertainty.
+
+## What v3 is not
+
+To keep the idea honest, v3 explicitly does **not** mean:
+
+- ❌ **LLM-emitted HEEx**
+  Never. The model does not write templates.
+
+- ❌ **Direct raw atom composition as the primary IR**
+  That is too low-level for the first serious version.
+
+- ❌ **A Resonance-owned component library**
+  The app still owns the actual product language and rendering.
+
+- ❌ **Replacing Phoenix as the runtime**
+  Phoenix still owns state, events, PubSub, forms, and LiveView semantics.
+
+- ❌ **A total replacement for all fixed product surfaces**
+  Some views should stay authored. Generated workspaces complement them.
+
+- ❌ **A single-step jump from v2 to the full north star**
+  There is probably a staircase here, not a cliff.
 
 ## How this coexists with v1 and v2
 
-v3 is **additive, not a replacement**.
+This remains additive.
 
-- **v1** (read-only function components via presenter dispatch) stays.
-  Useful when the developer wants specific charts/tables and doesn't want
-  the LLM composing them.
-- **v2** (interactive widgets, `Resonance.Widget` LiveComponents) stays.
-  Useful when the developer has a polished, high-fidelity interactive
-  surface they want the LLM to hand users wholesale.
-- **v3** is for the case where the developer wants the LLM to compose from
-  primitives rather than pick a pre-built thing.
+- **v1** stays for semantic-result-to-component routing when the developer wants
+  deterministic visual mappings.
 
-A presenter can mix all three. For a `:ranking` result, a presenter might:
-- Route to `FilterableLeaderboard` (v2 widget) if the dataset is "deals."
-- Route to a generic `Resonance.Components.BarChart` (v1) if the dataset is
-  anything else.
-- Route to `compose_view(...)` (v3) if the user's question asked for
-  something that doesn't fit either.
+- **v2** stays for polished, developer-authored interactive widgets and
+  higher-fidelity product surfaces.
 
-All three coexist on one page.
+- **v3** becomes the planner layer for cases where the user's problem does not
+  map cleanly to one pre-authored view.
 
-## Hard problems we don't yet know how to solve
+One generated workspace can mix all three:
 
-These are the real unknowns. None is a dealbreaker; all need investigation.
+- a v1 chart section
+- a v2 widget section
+- a v3-composed pattern section
 
-1. **Atom alphabet design.** Too few atoms and the LLM can't compose
-   anything interesting. Too many and it gets overwhelmed and produces
-   inconsistent outputs. The right size for a first UIKit is probably ~15
-   to ~25. Finding the right *shape* (how atomic is atomic?) is harder than
-   finding the right count.
+That is the right shape. Resonance should become more expressive without
+invalidating the simpler modes that already work.
 
-2. **Composition validity.** The LLM will produce malformed trees. We need
-   a validator that rejects them with specific error messages the LLM can
-   use to retry (this is where TK-057, the tool-use feedback loop, becomes
-   load-bearing).
+## The actual progression is probably not "v2 -> v3"
 
-3. **Visual consistency.** Composed views need to feel coherent, not like
-   a bag of components glued together. This depends partly on the atom set
-   (well-designed atoms compose coherently; poorly-designed ones don't) and
-   partly on LLM guidance in the system prompt.
+The earlier framing made it sound like the next big thing after widgets is
+freeform design-system composition. I no longer think that is the right next
+step.
 
-4. **Latency.** Composing a view shouldn't take 5 seconds. The LLM call is
-   the dominant cost. Streaming compositions (render as the tree arrives)
-   and caching common compositions are both plausible mitigations.
+What is more likely:
 
-5. **Accessibility.** A composed view is only as accessible as the atoms
-   it's built from. This pushes accessibility responsibility to the
-   developer, which is correct but not automatic. We should document
-   expectations for what a "good" UIKit atom looks like accessibility-wise.
+### v2.5: Generated workspaces over existing primitives
 
-6. **Cost.** Tokens aren't free. Composing 20 views a day per user at
-   current model prices is $0.X per user per day. Viable for some pricing
-   models, not for others. Needs measurement.
+Before any new composition contracts, add:
 
-7. **Trust boundary for LLM-composed mutations.** The LLM picking an action
-   is the same trust shape as the LLM picking a primitive — developer's
-   `perform/3` is the boundary. But forms composed on the fly may have
-   fields the LLM shouldn't be able to pre-fill. Needs a clean contract
-   for "this field is user-editable only."
+- report-level planning
+- section roles
+- better layout semantics
+- summary over assembled results
+- workspace persistence / identity
+- refinement flows over a saved/generated surface
 
-8. **Navigation and persistence.** If a user asks for a view and returns
-   three days later, does the same view re-compose? Deterministically?
-   This opens questions about view identity, caching, and whether
-   compositions should be persistable as first-class artifacts.
+This would already move Resonance closer to the philosophical top line.
 
-## Experiments to run before building
+### v2.6: Structured capability manifests
 
-These are cheap and they'll tell us most of what we need to know before
-committing real engineering.
+Introduce:
 
-1. **The "can it compose?" prototype.** 30 minutes. Hand-craft a small
-   UIKit description (10 atoms). Ask Claude or GPT-4 to produce a JSON
-   composition tree for "show me my top reps this week with a sparkline
-   next to each." Evaluate: is the tree well-formed? Is it using the atoms
-   sensibly? Does the nesting make sense? If yes, the core thesis has legs.
-   If no, the alphabet design or the prompting needs work before any code.
+- action manifests
+- interaction / pattern manifests
+- a more structured story around queryable capabilities
 
-2. **The "scale test."** Same thing but with a 30-atom realistic kit.
-   Does the model still compose coherently, or does the larger surface
-   make it thrash?
+This gives the planner real material to work with.
 
-3. **The "five questions" test.** Ask the model to compose five
-   meaningfully different views from the same UIKit ("top reps", "activity
-   heatmap", "deals stuck in discovery", "contact funnel", "a form to log
-   a call"). Evaluate diversity and correctness.
+### v3: Adaptive workspace planning
 
-4. **Cost and latency baseline.** Measure tokens and wall-clock for
-   realistic composition requests. Put a number on the cost.
+Once the middle layer exists, add:
 
-5. **The longitudinal proxy.** Generate 500 synthetic user questions
-   covering a breadth of CRM intents. Feed them through a prototype
-   composer. Measure: how many compositions are coherent, how many fail,
-   how many need a retry, how many the user would find useful.
+- `WorkspacePlan`
+- pattern kit selection
+- compilation into the app's render kit
+- optional action surfaces
 
-None of these require building v3 proper. They require an hour or two of
-prototyping outside the main Resonance codebase. The outputs tell us whether
-to file real tickets.
+That feels like a real v3.
+
+## The hard problems that matter now
+
+These are the questions the rewrite sharpens.
+
+1. **Plan schema design**
+   What is the right IR for a workspace? Too weak and it collapses back into a
+   bag of blocks. Too expressive and validation becomes hard.
+
+2. **Pattern granularity**
+   What is the right unit for model composition? Too coarse and the planner is
+   not useful. Too fine and outputs become inconsistent.
+
+3. **Validity and retry**
+   The planner will emit malformed or incoherent plans. We need validation with
+   actionable feedback, not silent failure.
+
+4. **Workspace identity**
+   When is a generated surface "the same workspace" across sessions? This is
+   critical for persistence, sharing, and trust.
+
+5. **Cross-section semantics**
+   How do sections refer to one another? How does a detail pane know which list
+   it supports? How does a summary cite supporting evidence?
+
+6. **Latency**
+   The planner cannot make the app feel sluggish. We need real measurements, and
+   probably a mix of caching, streaming, and staged refinement.
+
+7. **Mutation trust**
+   Once forms enter the picture, we need explicit control over what the model
+   may suggest, what it may prefill, and what the user must author themselves.
+
+8. **Visual coherence**
+   A generated workspace has to feel intentional. That pushes a lot of
+   responsibility into the pattern kit and its compile step.
+
+## The experiments to run before building anything serious
+
+These should stay cheap.
+
+### 1. Workspace-plan prototype
+
+Do **not** start with raw atoms.
+
+Hand-craft a pattern kit with maybe 10 to 15 patterns. Ask Claude or GPT to
+emit a `WorkspacePlan`-like JSON structure for five CRM questions.
+
+Evaluate:
+
+- Is the plan well-formed?
+- Are the section roles sensible?
+- Is the layout choice coherent?
+- Does it choose patterns reasonably?
+
+If this fails, raw atom composition would likely fail more noisily.
+
+### 2. Compiler prototype
+
+Take a hand-written workspace plan and compile it into today's Resonance
+renderables and widgets.
+
+This tests whether the "plan first, render second" architecture is a real fit
+for the current system.
+
+### 3. Persistence / rerun test
+
+Save a generated plan, rerun it against changed data, and inspect whether it
+still feels like the same workspace.
+
+This is closer to the real product than a one-shot generation demo.
+
+### 4. Single action-surface test
+
+Only after read-only planning looks good, test one composed form bound to one
+safe action, with strict validation.
+
+This tells us whether actions belong in the first real iteration or a later one.
+
+### 5. Longitudinal dogfood
+
+Put a prototype in front of someone who actually works in a CRM-like environment
+for weeks, not minutes.
+
+Count:
+
+- workspaces they return to
+- workspaces they save or share
+- refinements they make over time
+- requests that no one would have built as a fixed view
+
+That is the real thesis test.
 
 ## If the experiments work
 
-This becomes a roadmap, not a vision:
+This probably becomes a staircase rather than one branded "v3" launch.
 
-- **v0.4** — `Resonance.UIKit` behaviour, `expose` macro, `describe/0`
-  pipeline, LLM system prompt builder
-- **v0.5** — `compose_view` primitive, tree renderer, integration with the
-  existing presenter dispatch
-- **v0.6** — `Resonance.Actions` behaviour, `compose_form` primitive,
-  bound mutation handlers
-- **v0.7** — feedback loop validator, retry semantics, telemetry
-- **v0.8** — production hardening: caching, cost controls, accessibility
-  guardrails
+A plausible sequence:
 
-Each of those is a substantive sprint. None is a research project if the
-experiments succeed.
+- **Step 1:** report-level planning and workspace identity
+- **Step 2:** capability manifests and pattern kit
+- **Step 3:** planner -> `WorkspacePlan`
+- **Step 4:** compiled workspaces mixing v1, v2, and new patterns
+- **Step 5:** carefully scoped action surfaces
+- **Step 6:** optional lower-level composition for advanced apps
 
-## If the experiments don't work
+That feels like a product evolution, not a stunt.
 
-The work already done (v1, v2) is still useful on its own terms — chart
-and widget routing is valuable even if composition never ships. The v3
-thinking becomes an archived vision document and we revisit when models
-get another generation better or when we find a better architecture.
+## If the experiments do not work
 
-We wouldn't wasted a sprint building something we had to tear out, because
-we didn't build anything. That's the point of running the prototypes first.
+Then the result is still useful.
+
+v1 and v2 remain valuable on their own terms:
+
+- semantic-result routing
+- developer-owned presentation
+- Phoenix-native widgets
+
+This vision can stay archived as a serious line of thought that did not yet
+clear the bar. That is fine. A cheap failed experiment is vastly better than
+building a large wrong thing.
 
 ## What we commit to now
 
-1. **This document**, committed to the repo so future sessions and future
-   Greg can find it.
-2. **Nothing else.** No tickets for v3 proper. No code. No branches.
-3. **One cheap next step:** when the v0.2 polish work is done, spend an
-   hour on experiment #1 (the "can it compose?" prototype). Come back with
-   a real answer.
+1. **Keep the north star.**
+   The philosophical direction is still worth pursuing.
 
-The vision is recorded. The experiments are defined. The commitment is to
-run the cheap test before doing anything more.
+2. **Change the immediate framing.**
+   The next step is generated workspaces, not raw atom composition.
 
----
+3. **Run cheap tests first.**
+   Especially the workspace-plan prototype and compiler prototype.
 
-**Appendix: what Resonance is *not* doing with this vision**
+4. **Do not force a direct v2 -> v3 jump.**
+   There is probably at least one missing middle version here.
 
-To keep the north star honest, here's a list of things this direction
-explicitly *isn't* about:
+That is the revised position.
 
-- **Not a code generator.** v0, Bolt, Cursor, Lovable — these produce
-  static code at build time. A developer commits the output. Different
-  product.
-- **Not a dashboard builder.** Grafana, Retool, Looker — these let a
-  *human* pick from a vendor's fixed widget library to assemble a
-  dashboard. Here the user's question picks from the developer's own
-  design system at runtime.
-- **Not a chat interface.** ChatGPT, Claude.ai — these produce text or
-  inline charts. They don't compose interactive forms bound to your app's
-  mutations. They don't live inside your product.
-- **Not a headless UI library.** Radix, Aria — these need a developer to
-  assemble atoms into pages. Here the assembly is the LLM's job at
-  runtime.
-- **Not a low-code platform.** Bubble, Webflow — these are no-code for
-  humans. Here the human writes the app normally; the LLM is the one
-  composing at the edges.
+The application is not just a vocabulary.
+It is a field of capabilities.
 
-What it *is* trying to be: the runtime layer that makes a Phoenix
-developer's existing design system and data layer addressable by a user's
-natural-language question, at query time, with real interactivity and real
-mutations.
-
-Whether that's a real product is the question the experiments will
-answer.
+The UI question is not "which page should exist?"
+It is "what workspace should this intent project right now?"
