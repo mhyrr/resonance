@@ -15,30 +15,102 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   @valid_datasets ~w(companies contacts deals activities)
 
+  @capabilities %{
+    description: "CRM demo data for companies, contacts, deals, and activities.",
+    datasets: [
+      %{
+        name: "companies",
+        description:
+          "Accounts with industry, size, revenue, and region attributes.",
+        fields: ~w(name industry size revenue region),
+        measures: ["count(*)", "sum(revenue)", "avg(revenue)"],
+        dimensions: ~w(name industry region size),
+        filters: [
+          %{field: "industry", ops: ["="]},
+          %{field: "region", ops: ["="]},
+          %{field: "size", ops: ["="]}
+        ],
+        query_shapes: [
+          %{dimensions: [], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]},
+          %{dimensions: ["name"], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]},
+          %{dimensions: ["industry"], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]},
+          %{dimensions: ["region"], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]},
+          %{dimensions: ["size"], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]}
+        ]
+      },
+      %{
+        name: "contacts",
+        description: "People in the CRM pipeline.",
+        fields: ~w(name email stage title company_id),
+        measures: ["count(*)"],
+        dimensions: ~w(name stage),
+        filters: [
+          %{field: "stage", ops: ["="]}
+        ],
+        query_shapes: [
+          %{dimensions: [], measures: ["count(*)"]},
+          %{dimensions: ["name"], measures: ["count(*)"]},
+          %{dimensions: ["stage"], measures: ["count(*)"]}
+        ]
+      },
+      %{
+        name: "deals",
+        description:
+          "Sales opportunities with value, stage, close quarter, owner, and company.",
+        fields: ~w(name value stage close_date owner quarter company_id),
+        measures: ["count(*)", "sum(value)", "avg(value)"],
+        dimensions: ~w(name stage quarter owner),
+        filters: [
+          %{field: "stage", ops: ["="], values: ~w(prospecting discovery proposal negotiation closed_won closed_lost)},
+          %{field: "quarter", ops: ["="]},
+          %{field: "owner", ops: ["="], values: ~w(Alice Bob Carol Dave)}
+        ],
+        query_shapes: [
+          %{dimensions: [], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["name"], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["stage"], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["quarter"], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["owner"], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["stage", "quarter"], measures: ["count(*)", "sum(value)", "avg(value)"]}
+        ]
+      },
+      %{
+        name: "activities",
+        description: "Sales activities linked to contacts.",
+        fields: ~w(type date outcome contact_id),
+        measures: ["count(*)"],
+        dimensions: ~w(type outcome),
+        filters: [
+          %{field: "type", ops: ["="], values: ~w(call email meeting demo follow_up)},
+          %{field: "outcome", ops: ["="], values: ~w(positive neutral negative no_response)}
+        ],
+        query_shapes: [
+          %{dimensions: [], measures: ["count(*)"]},
+          %{dimensions: ["type"], measures: ["count(*)"]},
+          %{dimensions: ["outcome"], measures: ["count(*)"]}
+        ]
+      }
+    ],
+    notes: [
+      "Deal stages are prospecting, discovery, proposal, negotiation, closed_won, and closed_lost.",
+      "Owners are Alice, Bob, Carol, and Dave.",
+      "Use quarter strings such as 2025-Q1 for quarter filters."
+    ]
+  }
+
   @impl true
   def describe do
-    """
-    Datasets:
-    - "companies" — fields: name, industry, size (Enterprise/Mid-Market/Small), revenue, region (West/East/South/Midwest)
-      measures: count(*), sum(revenue), avg(revenue)
-      dimensions: industry, region, size
-
-    - "contacts" — fields: name, email, stage (lead/qualified/opportunity/customer/churned), title, company_id
-      measures: count(*)
-      dimensions: stage
-
-    - "deals" — fields: name, value, stage (prospecting/discovery/proposal/negotiation/closed_won/closed_lost), close_date, owner (Alice/Bob/Carol/Dave), quarter (e.g. 2025-Q1), company_id
-      measures: count(*), sum(value), avg(value)
-      dimensions: stage, quarter, owner
-
-    - "activities" — fields: type (call/email/meeting/demo/follow_up), date, outcome (positive/neutral/negative/no_response), contact_id
-      measures: count(*)
-      dimensions: type, outcome
-    """
+    @capabilities
   end
 
   @impl true
-  def validate(%Resonance.QueryIntent{dataset: dataset}, _context) do
+  def validate(%Resonance.QueryIntent{} = intent, _context) do
+    with :ok <- validate_dataset(intent.dataset) do
+      Resonance.Resolver.validate_intent(intent, @capabilities)
+    end
+  end
+
+  defp validate_dataset(dataset) do
     if dataset in @valid_datasets,
       do: :ok,
       else: {:error, {:unknown_dataset, dataset}}

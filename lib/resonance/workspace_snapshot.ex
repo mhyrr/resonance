@@ -338,7 +338,7 @@ defmodule Resonance.WorkspaceSnapshot do
   defp existing_atom(value) when is_binary(value) do
     {:ok, String.to_existing_atom(value)}
   rescue
-    ArgumentError -> {:error, {:unknown_atom, value}}
+    ArgumentError -> {:ok, value}
   end
 
   defp existing_atom(value) when is_atom(value) and not is_nil(value), do: {:ok, value}

@@ -207,6 +207,7 @@ defmodule ResonanceDemoWeb.WorkspaceLive do
   defp workspace_context do
     %{
       resolver: ResonanceDemo.CRM.Resolver,
+      patterns: ResonanceDemo.CRM.Patterns,
       presenter: ResonanceDemoWeb.Presenters.Interactive
     }
   end

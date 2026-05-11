@@ -11,7 +11,7 @@ defmodule Resonance.WorkspaceCompiler do
   report pipeline already knows how to display.
   """
 
-  alias Resonance.{Composer, Renderable, WorkspacePlan}
+  alias Resonance.{Composer, Patterns, Renderable, WorkspacePlan}
   alias Resonance.LLM.ToolCall
   alias Resonance.WorkspacePlan.Section
 
@@ -35,7 +35,8 @@ defmodule Resonance.WorkspaceCompiler do
   @spec compile(WorkspacePlan.t(), map()) ::
           {:ok, compiled_workspace()} | {:error, {:validation_failed, [map()]}}
   def compile(%WorkspacePlan{} = plan, context \\ %{}) when is_map(context) do
-    with {:ok, validated_plan} <- WorkspacePlan.validate(plan) do
+    with {:ok, validated_plan} <-
+           WorkspacePlan.validate(plan, patterns: Patterns.from_context(context)) do
       compiled_sections =
         Enum.map(validated_plan.sections, fn section ->
           compile_section(validated_plan, section, context)

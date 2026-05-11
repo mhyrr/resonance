@@ -67,6 +67,39 @@ defmodule Resonance.WorkspacePlanTest do
       assert error.path == [:sections, "summary", :pattern]
     end
 
+    test "rejects incompatible section pattern and source primitive" do
+      plan =
+        valid_plan(%{
+          sections: [
+            valid_section(%{
+              role: :primary,
+              pattern: :metric_strip,
+              source: {:tool_call, tool_call("rank_entities")}
+            })
+          ]
+        })
+
+      assert {:error, {:validation_failed, [error]}} = Validation.validate(plan)
+      assert error.code == :incompatible_pattern_source
+      assert error.path == [:sections, "summary", :source, :tool_call, :name]
+      assert error.details.allowed_primitives == ["segment_population"]
+    end
+
+    test "accepts app-declared section patterns" do
+      plan =
+        valid_plan(%{
+          sections: [
+            valid_section(%{
+              role: :focus_list,
+              pattern: :deal_focus_list,
+              source: {:tool_call, tool_call("rank_entities")}
+            })
+          ]
+        })
+
+      assert {:ok, ^plan} = WorkspacePlan.validate(plan, patterns: custom_patterns())
+    end
+
     test "rejects invalid section source" do
       plan = valid_plan(%{sections: [valid_section(%{source: {:query, %{dataset: "deals"}}})]})
 
@@ -132,6 +165,40 @@ defmodule Resonance.WorkspacePlanTest do
       assert Validation.allowed_layouts() == [:stack, :dashboard_grid, :overview_with_detail]
       assert :focus_list in Validation.allowed_roles()
       assert :entity_list in Validation.allowed_patterns()
+      assert :deal_focus_list in Validation.allowed_patterns(patterns: custom_patterns())
+    end
+  end
+
+  describe "from_map/2" do
+    test "decodes app-declared pattern names without creating arbitrary atoms" do
+      map = %{
+        "goal" => "deal_focus",
+        "title" => "Deal focus",
+        "layout" => "stack",
+        "sections" => [
+          %{
+            "id" => "top_deals",
+            "role" => "focus_list",
+            "pattern" => "deal_focus_list",
+            "source" => %{
+              "type" => "tool_call",
+              "tool_call" => %{
+                "id" => "call_top_deals",
+                "name" => "rank_entities",
+                "arguments" => %{
+                  "dataset" => "deals",
+                  "measures" => ["sum(value)"],
+                  "dimensions" => ["name"],
+                  "title" => "Top deals"
+                }
+              }
+            }
+          }
+        ]
+      }
+
+      assert {:ok, plan} = WorkspacePlan.from_map(map, patterns: custom_patterns())
+      assert [%Section{pattern: :deal_focus_list}] = plan.sections
     end
   end
 
@@ -170,5 +237,17 @@ defmodule Resonance.WorkspacePlanTest do
         "title" => "Pipeline"
       }
     }
+  end
+
+  defp custom_patterns do
+    [
+      %{
+        name: :deal_focus_list,
+        description: "CRM deal list for follow-up work.",
+        roles: [:focus_list, :detail],
+        result_kinds: [:ranking],
+        source_primitives: ["rank_entities"]
+      }
+    ]
   end
 end

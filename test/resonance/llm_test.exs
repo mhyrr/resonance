@@ -1,6 +1,11 @@
 defmodule Resonance.LLMTest do
   use ExUnit.Case, async: true
 
+  alias Resonance.LLM.ToolCall
+  alias Resonance.WorkspaceContext
+  alias Resonance.WorkspacePlan
+  alias Resonance.WorkspacePlan.Section
+
   defmodule DescribingResolver do
     @behaviour Resonance.Resolver
 
@@ -53,6 +58,43 @@ defmodule Resonance.LLMTest do
 
       assert prompt =~ "data analysis assistant"
       refute prompt =~ "Datasets:"
+    end
+
+    test "appends workspace context when provided" do
+      workspace_context =
+        %WorkspacePlan{
+          goal: :pipeline_review,
+          title: "Pipeline review",
+          layout: :stack,
+          sections: [
+            %Section{
+              id: "stage_mix",
+              title: "Pipeline by stage",
+              role: :primary,
+              pattern: :summary_panel,
+              source:
+                {:tool_call,
+                 %ToolCall{
+                   id: "call_stage_mix",
+                   name: "show_distribution",
+                   arguments: %{
+                     "dataset" => "deals",
+                     "measures" => ["sum(value)"],
+                     "dimensions" => ["stage"],
+                     "title" => "Pipeline by stage"
+                   }
+                 }}
+            }
+          ]
+        }
+        |> WorkspaceContext.from_plan(original_prompt: "Show pipeline by stage.")
+
+      prompt = Resonance.LLM.build_system_prompt(%{workspace_context: workspace_context})
+
+      assert prompt =~ "Current workspace context"
+      assert prompt =~ "original_prompt=\"Show pipeline by stage.\""
+      assert prompt =~ "id=stage_mix"
+      assert prompt =~ "Follow-up rules"
     end
   end
 end

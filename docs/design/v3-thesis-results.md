@@ -4,6 +4,45 @@
 > vision doc. It records what the current implementation proves, what it does
 > not prove, and why the remaining v3 work is still worth doing.
 
+## 2026-05-11 planner/pattern update
+
+The implementation now proves the planner contract with mocked providers:
+
+```text
+CRM prompt
+  -> create_workspace_plan tool call
+  -> JSON-safe WorkspacePlan decoding
+  -> deterministic validation against resolver capabilities and pattern manifest
+  -> WorkspaceCompiler
+  -> existing Renderables/Widgets
+```
+
+The golden CRM eval currently exercises ten prompts through planner validation
+and compilation. Invalid outputs return structured validation errors, and one
+validation-feedback retry is measured by the harness.
+
+This still does **not** prove that a production LLM will reliably choose the
+right plan on live prompts. It proves the contract the model must satisfy:
+available datasets, measures, dimensions, filters, query shapes, roles,
+patterns, and primitive sources are declared structurally, and impossible plans
+fail before rendering.
+
+The pattern layer is deliberately small. `Resonance.Patterns` is a manifest of
+planner-facing names and compatibility rules, not a Phoenix component behavior.
+The planner sees descriptions, roles, result kinds, and allowed source
+primitives. It does not see HEEx, component modules, CSS classes, or raw atom
+trees. The CRM demo can add a product-specific pattern such as
+`:deal_focus_list` without forking Resonance internals.
+
+Workspace-scoped follow-up context now has a pure value boundary:
+`Resonance.WorkspaceContext` can summarize a plan, compiled workspace, or
+snapshot into planner-facing context. Planner prompts can therefore include the
+current workspace's original prompt, sections, roles, patterns, stored primitive
+sources, filters, and latest result summaries without making LiveView own the
+reasoning contract. This proves the follow-up prompt contract; the reusable
+`Resonance.Live.Workspace` surface still needs to decide when to capture,
+persist, and pass that context.
+
 ## The claim under test
 
 The v3 vision made a strong claim:
@@ -298,4 +337,3 @@ The success bar should be unforgiving. If planner mode cannot reliably emit
 valid, useful plans against a capability manifest, then v3 collapses back into
 dashboard routing. If it can, Resonance becomes something more interesting: a
 runtime for user-shaped product surfaces.
-
