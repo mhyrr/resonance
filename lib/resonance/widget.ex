@@ -5,10 +5,9 @@ defmodule Resonance.Widget do
   A Widget is a Phoenix LiveComponent that knows it can render certain
   Resonance `Result` kinds. After Resonance composes the page from the user's
   question, the widget is **just a Phoenix LiveComponent** — it calls your
-  app's contexts from `handle_event/3`, subscribes to `Phoenix.PubSub` for
-  live updates, manages local state in socket assigns, and handles mutations
-  the way every other LiveComponent does. **The library composes; Phoenix
-  runs.**
+  app's contexts from `handle_event/3`, manages local state in socket assigns,
+  receives parent-forwarded refreshes, and handles mutations the way every
+  other LiveComponent does. **The library composes; Phoenix runs.**
 
   ## Usage
 
@@ -49,13 +48,9 @@ defmodule Resonance.Widget do
         end
 
         # Standard Phoenix.LiveComponent callbacks below — Resonance has
-        # nothing to teach you here.
-        @impl Phoenix.LiveComponent
-        def mount(socket) do
-          if connected?(socket), do: Phoenix.PubSub.subscribe(MyApp.PubSub, "deals")
-          {:ok, socket}
-        end
-
+        # nothing to teach you here. If external data changes, the parent
+        # LiveView owns any PubSub subscription and forwards a refreshed
+        # renderable through update/2.
         @impl Phoenix.LiveComponent
         def update(%{renderable: r} = assigns, socket) do
           {:ok,
@@ -68,12 +63,6 @@ defmodule Resonance.Widget do
         @impl Phoenix.LiveComponent
         def handle_event("filter_stage", %{"stage" => stage}, socket) do
           rows = Deals.top_by_value(stage: stage, user: socket.assigns.current_user)
-          {:noreply, assign(socket, :rows, rows)}
-        end
-
-        @impl Phoenix.LiveComponent
-        def handle_info({:deals_changed, _}, socket) do
-          rows = Deals.top_by_value(user: socket.assigns.current_user)
           {:noreply, assign(socket, :rows, rows)}
         end
 
@@ -95,7 +84,8 @@ defmodule Resonance.Widget do
     app contexts.
   - **From `Phoenix.LiveComponent`:** `update/2` accepts a `:renderable`
     assign carrying a `%Resonance.Renderable{}`. The widget reads `:props`
-    off it for initial state. Everything else is normal LiveComponent.
+    off it for initial state and parent-forwarded refreshes. Everything else
+    is normal LiveComponent.
 
   ## Symmetry with `Resonance.Component`
 

@@ -6,11 +6,11 @@ An Elixir library that lets users ask questions about application data and recei
 
 > *Resonance lets the user's question pick from the developer's design system.*
 >
-> The developer defines the look, components, and data; Resonance is the runtime that lets a user's natural-language question compose those into a new view at query time. Models are smart enough to know what a user wants, they just need the right context from the developer to build it.
+> The developer defines the look, components, and data; Resonance is the composer layer that lets a user's natural-language question become a new view at query time. Models are smart enough to know what a user wants, they just need the right context from the developer to build it.
 
 ![Resonance widget playground rendering an interactive TrendSparkline against live CRM data](docs/images/playground-hero.png)
 
-*The widget playground — every `Resonance.Widget` your app provides, enumerated and rendered against real data through your own contexts. Filter chips, refresh, and live PubSub-driven updates all work the way Phoenix LiveComponents already do; Resonance just composed the page.*
+*The widget playground — every `Resonance.Widget` your app provides, enumerated and rendered against real data through your own contexts. Filter chips, refresh, and parent-forwarded PubSub updates all work through normal Phoenix LiveComponent patterns; Resonance just composed the page.*
 
 ## How It Works
 
@@ -504,7 +504,7 @@ Everything else — your Resolver, the LLM tool flow, the function component pat
 
 ### Live updates from data changes
 
-Because widgets are real LiveComponents, you handle live updates the way Phoenix already does it: subscribe to a `Phoenix.PubSub` topic in the *parent LiveView*, and on receiving a message call `Phoenix.LiveView.send_update/2` to push a refreshed `:renderable` (or fresh assigns) into the widget. LiveComponents share their parent process and can't subscribe directly — but the parent owning the subscription is the standard pattern.
+Because widgets are real LiveComponents, you handle live updates the way Phoenix already does it: subscribe to a `Phoenix.PubSub` topic in the *parent LiveView*, and on receiving a message call `Phoenix.LiveView.send_update/2` to push a refreshed `:renderable` into the widget. LiveComponents share their parent process and can't subscribe directly — but the parent owning the subscription is the standard pattern.
 
 ### The widget contract
 

@@ -7,8 +7,9 @@ defmodule ResonanceDemo.Deals do
   also delegates here for some queries); the user-driven path skips Resonance
   entirely and calls these functions directly.
 
-  Mutations broadcast on the `"deals"` PubSub topic so subscribed widgets
-  can refresh themselves without any Resonance involvement.
+  Mutations broadcast on the `"deals"` PubSub topic so parent LiveViews or
+  developer surfaces can refresh themselves, or forward refreshed renderables
+  to mounted widgets, without any Resonance-owned mutation runtime.
   """
 
   import Ecto.Query
@@ -22,7 +23,7 @@ defmodule ResonanceDemo.Deals do
   @pubsub ResonanceDemo.PubSub
   @topic "deals"
 
-  @doc "PubSub topic deal-watching widgets should subscribe to."
+  @doc "PubSub topic deal-watching parent surfaces should subscribe to."
   def topic, do: @topic
   def pubsub, do: @pubsub
 
@@ -125,7 +126,7 @@ defmodule ResonanceDemo.Deals do
   summary is a human-readable string describing the change.
   """
   def simulate_batch do
-    company_ids = Repo.all(from c in Company, select: c.id)
+    company_ids = Repo.all(from(c in Company, select: c.id))
     count = Enum.random(5..12)
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 

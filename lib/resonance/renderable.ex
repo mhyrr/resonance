@@ -74,8 +74,8 @@ defmodule Resonance.Renderable do
   Use this from a Presenter when you want the component to be interactive.
   `Live.Report` will mount it via `<.live_component>`. Once mounted, the
   widget is a normal Phoenix LiveComponent — it calls your app contexts
-  from `handle_event/3`, subscribes to PubSub, etc. Resonance is no longer
-  in the runtime path.
+  from `handle_event/3` and receives parent-forwarded refreshes through
+  `update/2`. Resonance is no longer in the runtime path.
   """
   def ready_live(type, widget, props) do
     %__MODULE__{

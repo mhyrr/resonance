@@ -67,7 +67,7 @@ defmodule ResonanceDemoWeb.Widgets.FilterableLeaderboard do
   # nothing to teach you. Call your own contexts from handle_event, manage
   # local state in assigns. PubSub auto-updates are handled by the parent
   # LiveView (it subscribes and forwards via send_update with a refreshed
-  # `:rows` assign).
+  # `:renderable` assign).
   # =====
 
   @impl Phoenix.LiveComponent
@@ -161,7 +161,9 @@ defmodule ResonanceDemoWeb.Widgets.FilterableLeaderboard do
   defp row_label(row), do: row[:label] || row["label"] || "—"
   defp row_value(row), do: row[:value] || row["value"] || 0
 
-  defp format_value(n) when is_number(n) and n >= 1_000_000, do: "#{Float.round(n / 1_000_000, 1)}M"
+  defp format_value(n) when is_number(n) and n >= 1_000_000,
+    do: "#{Float.round(n / 1_000_000, 1)}M"
+
   defp format_value(n) when is_number(n) and n >= 1_000, do: "#{Float.round(n / 1_000, 1)}K"
   defp format_value(n) when is_number(n), do: Integer.to_string(trunc(n))
   defp format_value(_), do: "—"

@@ -6,7 +6,8 @@ defmodule ResonanceDemoWeb.Widgets.OwnerScorecard do
   user scope the view to a specific quarter via chip filters. Quarter
   selection calls `Deals.by_owner/1` directly.
 
-  Subscribes to the `"deals"` PubSub topic for live updates.
+  External live updates come from the parent surface forwarding a refreshed
+  Renderable; this widget owns local filters and rendering.
   """
 
   use Resonance.Widget
@@ -152,7 +153,9 @@ defmodule ResonanceDemoWeb.Widgets.OwnerScorecard do
   defp initial(name) when is_binary(name), do: name |> String.first() |> String.upcase()
   defp initial(_), do: "?"
 
-  defp format_value(n) when is_number(n) and n >= 1_000_000, do: "#{Float.round(n / 1_000_000, 2)}M"
+  defp format_value(n) when is_number(n) and n >= 1_000_000,
+    do: "#{Float.round(n / 1_000_000, 2)}M"
+
   defp format_value(n) when is_number(n) and n >= 1_000, do: "#{Float.round(n / 1_000, 1)}K"
   defp format_value(n) when is_number(n), do: Integer.to_string(trunc(n))
   defp format_value(_), do: "—"

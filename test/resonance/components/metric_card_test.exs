@@ -68,6 +68,16 @@ defmodule Resonance.Components.MetricCardTest do
       assert html =~ "$1,500"
     end
 
+    test "formats currency when format is atom currency" do
+      html =
+        render_component(MetricCard, %{
+          renderable_id: "m-1",
+          props: %{value: 1500, format: :currency}
+        })
+
+      assert html =~ "$1,500"
+    end
+
     test "formats percent when format is percent" do
       html =
         render_component(MetricCard, %{

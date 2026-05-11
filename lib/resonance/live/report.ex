@@ -11,8 +11,10 @@ defmodule Resonance.Live.Report do
         current_user={@current_user}
       />
 
-  No parent LiveView wiring needed — the component handles the full
-  lifecycle internally via `send_update/3`.
+  Basic report generation needs no parent LiveView wiring — the component
+  handles its lifecycle internally via `send_update/3`. For app-owned
+  external updates, the parent can call `send_update/2` with `refresh: true`
+  and `Live.Report` will re-resolve stored tool calls.
   """
 
   use Phoenix.LiveComponent

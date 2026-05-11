@@ -29,7 +29,8 @@ defmodule Resonance.Presenters.Default do
         %{
           title: result.title,
           data: result.data,
-          multi_series: true
+          multi_series: true,
+          format: result.format
         }
       )
     else
@@ -39,7 +40,8 @@ defmodule Resonance.Presenters.Default do
         %{
           title: result.title,
           data: result.data,
-          orientation: "vertical"
+          orientation: "vertical",
+          format: result.format
         }
       )
     end
@@ -53,7 +55,8 @@ defmodule Resonance.Presenters.Default do
         %{
           title: result.title,
           data: result.data,
-          orientation: "horizontal"
+          orientation: "horizontal",
+          format: result.format
         }
       )
     else
@@ -63,7 +66,8 @@ defmodule Resonance.Presenters.Default do
         %{
           title: result.title,
           data: result.data,
-          sortable: true
+          sortable: true,
+          format: result.format
         }
       )
     end
@@ -78,7 +82,8 @@ defmodule Resonance.Presenters.Default do
           title: result.title,
           data: result.data,
           donut: true,
-          show_percentages: true
+          show_percentages: true,
+          format: result.format
         }
       )
     else
@@ -88,7 +93,8 @@ defmodule Resonance.Presenters.Default do
         %{
           title: result.title,
           data: result.data,
-          orientation: "horizontal"
+          orientation: "horizontal",
+          format: result.format
         }
       )
     end
@@ -101,7 +107,7 @@ defmodule Resonance.Presenters.Default do
           %{
             label: row[:label] || row["label"] || "Segment",
             value: row[:value] || row["value"] || row[:count] || row["count"] || 0,
-            format: detect_format(row)
+            format: field_format(result.format, :value) || detect_format(row)
           }
         end)
 
@@ -111,7 +117,8 @@ defmodule Resonance.Presenters.Default do
         %{
           title: result.title,
           metrics: metrics,
-          columns: min(length(metrics), 3)
+          columns: min(length(metrics), 3),
+          format: result.format
         }
       )
     else
@@ -121,7 +128,8 @@ defmodule Resonance.Presenters.Default do
         %{
           title: result.title,
           data: result.data,
-          sortable: true
+          sortable: true,
+          format: result.format
         }
       )
     end
@@ -134,7 +142,8 @@ defmodule Resonance.Presenters.Default do
       %{
         title: result.title,
         content: result.metadata[:content] || "",
-        style: "summary"
+        style: "summary",
+        format: result.format
       }
     )
   end
@@ -147,7 +156,8 @@ defmodule Resonance.Presenters.Default do
       %{
         title: result.title,
         data: result.data,
-        sortable: true
+        sortable: true,
+        format: result.format
       }
     )
   end
@@ -160,4 +170,10 @@ defmodule Resonance.Presenters.Default do
   defp detect_format(row) do
     row[:format] || row["format"] || "number"
   end
+
+  defp field_format(format, field) when is_map(format) do
+    Map.get(format, field) || Map.get(format, to_string(field))
+  end
+
+  defp field_format(_format, _field), do: nil
 end
