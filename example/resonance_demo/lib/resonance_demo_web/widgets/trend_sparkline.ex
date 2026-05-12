@@ -143,7 +143,15 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
                 </linearGradient>
               </defs>
               <path d={@summary.fill} fill={"url(#grad-" <> @id <> ")"}></path>
-              <path d={@summary.path} fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path
+                d={@summary.path}
+                fill="none"
+                stroke="#3b82f6"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+              </path>
               <%= for {x, y} <- @summary.points do %>
                 <circle cx={x} cy={y} r="3" fill="#3b82f6"></circle>
               <% end %>
@@ -160,7 +168,9 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
         <div class="flex flex-col gap-2 min-w-[110px]">
           <div>
             <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Latest</div>
-            <div class="text-lg font-semibold text-gray-900 tabular-nums">${format_value(@summary.latest)}</div>
+            <div class="text-lg font-semibold text-gray-900 tabular-nums">
+              ${format_value(@summary.latest)}
+            </div>
           </div>
           <div>
             <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Peak</div>

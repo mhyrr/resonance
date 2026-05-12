@@ -17,9 +17,11 @@ CRM prompt
   -> existing Renderables/Widgets
 ```
 
-The golden CRM eval currently exercises ten prompts through planner validation
-and compilation. Invalid outputs return structured validation errors, and one
-validation-feedback retry is measured by the harness.
+The golden CRM eval currently exercises twelve prompts through planner validation
+and compilation, including one weird forecast-risk ask and one long-form board
+packet ask that compiles into a larger dashboard. Invalid outputs return
+structured validation errors, and one validation-feedback retry is measured by
+the harness.
 
 This still does **not** prove that a production LLM will reliably choose the
 right plan on live prompts. It proves the contract the model must satisfy:
@@ -42,6 +44,30 @@ sources, filters, and latest result summaries without making LiveView own the
 reasoning contract. This proves the follow-up prompt contract; the reusable
 `Resonance.Live.Workspace` surface still needs to decide when to capture,
 persist, and pass that context.
+
+`Resonance.Live.Workspace` now exists as a separate LiveComponent surface. It
+keeps `Live.Report` compatible, owns the workspace lifecycle states
+(`:planning`, `:resolving`, `:ready`, `:failed`), calls the planner/compiler,
+captures snapshots and follow-up context, supports rerun/save/refine
+affordances, ignores a second prompt while busy, and emits workspace planning
+and resolving telemetry. Persistence remains app-owned through an optional save
+callback or snapshot assigns. The CRM `/workspace` route is now a thin wrapper
+around this reusable surface rather than a bespoke compiler harness.
+
+The missing planner proof now has its own artifact:
+`docs/design/v3-planner-eval-results.md`. The CRM example app exposes
+`/planner-eval`, which runs twelve deterministic CRM planner prompts through
+`Planner.plan_result/3`, validation, the workspace compiler, and
+`Resonance.Live.Workspace`. Under the mocked-provider contract eval, all twelve
+prompts produce valid typed plans and compile, while an intentionally bad
+probability-field plan is rejected with actionable validation errors.
+
+A first real-provider attempt found the expected kind of failure: the model used
+invented measure names and a non-declared filter shape. That hardened the
+boundary. Non-list filters now fail as query-intent validation errors instead of
+crashing, and `WorkspaceCompiler.compile/2` validates tool calls against
+structured resolver capabilities before resolving sections. The eval also no
+longer counts section-local error renderables as compiled success.
 
 ## The claim under test
 

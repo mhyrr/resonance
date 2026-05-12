@@ -62,7 +62,10 @@ defmodule ResonanceDemoWeb.ExploreLive do
         class="mb-4 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between"
       >
         <span>{@data_flash}</span>
-        <button phx-click="dismiss_flash" class="text-emerald-600 hover:text-emerald-800 ml-4 cursor-pointer">
+        <button
+          phx-click="dismiss_flash"
+          class="text-emerald-600 hover:text-emerald-800 ml-4 cursor-pointer"
+        >
           &times;
         </button>
       </div>

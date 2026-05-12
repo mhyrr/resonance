@@ -28,6 +28,29 @@ defmodule Resonance.LLMTest do
     def resolve(_intent, _context), do: {:ok, []}
   end
 
+  defmodule OverrideProvider do
+    @behaviour Resonance.LLM.Provider
+
+    @impl true
+    def chat(prompt, _tools, opts) do
+      send(opts[:test_pid], {:provider_called, prompt, opts[:system]})
+      {:ok, []}
+    end
+  end
+
+  describe "chat/4" do
+    test "accepts an explicit provider override without mutating app config" do
+      assert {:ok, []} =
+               Resonance.LLM.chat("Plan a workspace", [], %{},
+                 provider: OverrideProvider,
+                 system: "system prompt",
+                 test_pid: self()
+               )
+
+      assert_receive {:provider_called, "Plan a workspace", "system prompt"}
+    end
+  end
+
   describe "build_system_prompt/1" do
     test "includes base instructions" do
       prompt = Resonance.LLM.build_system_prompt(%{})

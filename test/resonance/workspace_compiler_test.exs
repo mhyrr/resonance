@@ -7,8 +7,36 @@ defmodule Resonance.WorkspaceCompilerTest do
   alias Resonance.WorkspacePlan
   alias Resonance.WorkspacePlan.Section
 
+  defmodule CRMCapabilities do
+    def manifest do
+      %{
+        datasets: [
+          %{
+            name: "deals",
+            description: "CRM opportunities",
+            fields: ~w(name value stage owner),
+            measures: ["count(*)", "sum(value)"],
+            dimensions: ~w(name stage owner),
+            filters: [
+              %{field: "stage", ops: ["="]},
+              %{field: "owner", ops: ["="]}
+            ],
+            query_shapes: [
+              %{dimensions: ["name"], measures: ["count(*)", "sum(value)"]},
+              %{dimensions: ["stage"], measures: ["count(*)", "sum(value)"]},
+              %{dimensions: ["owner"], measures: ["count(*)", "sum(value)"]}
+            ]
+          }
+        ]
+      }
+    end
+  end
+
   defmodule CRMResolver do
     @behaviour Resonance.Resolver
+
+    @impl true
+    def describe, do: CRMCapabilities.manifest()
 
     @impl true
     def resolve(_intent, _context) do
@@ -42,6 +70,9 @@ defmodule Resonance.WorkspaceCompilerTest do
 
   defmodule RecordingResolver do
     @behaviour Resonance.Resolver
+
+    @impl true
+    def describe, do: CRMCapabilities.manifest()
 
     @impl true
     def resolve(_intent, context) do
@@ -127,6 +158,37 @@ defmodule Resonance.WorkspaceCompilerTest do
                WorkspaceCompiler.compile(plan, %{resolver: RecordingResolver, test_pid: self()})
 
       assert error.code == :missing_sections
+      refute_received :resolver_called
+    end
+
+    test "returns capability validation errors before resolving invalid tool calls" do
+      plan = %{
+        workspace_plan()
+        | sections: [
+            %Section{
+              id: "bad_measure",
+              role: :focus_list,
+              pattern: :entity_list,
+              source:
+                {:tool_call,
+                 %ToolCall{
+                   id: "call_bad_measure",
+                   name: "rank_entities",
+                   arguments: %{
+                     "dataset" => "deals",
+                     "measures" => ["deal_value"],
+                     "dimensions" => ["name"],
+                     "title" => "Bad measure"
+                   }
+                 }}
+            }
+          ]
+      }
+
+      assert {:error, {:validation_failed, errors}} =
+               WorkspaceCompiler.compile(plan, %{resolver: RecordingResolver, test_pid: self()})
+
+      assert Enum.any?(errors, &match?(%{code: :unsupported_measure}, &1))
       refute_received :resolver_called
     end
 

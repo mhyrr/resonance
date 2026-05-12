@@ -278,10 +278,16 @@ defmodule Resonance.Planner do
      %{reason: elem(error, 1), attempts: attempt, retried?: attempt > 1, recovered?: false}}
   end
 
-  defp request_plan(prompt, context, capabilities, pattern_manifest, workspace_context, _opts) do
-    case LLM.chat(prompt, [create_workspace_plan_schema(pattern_manifest)], context,
-           system: build_system_prompt(capabilities, pattern_manifest, workspace_context)
-         ) do
+  defp request_plan(prompt, context, capabilities, pattern_manifest, workspace_context, opts) do
+    llm_opts =
+      opts
+      |> Keyword.take([:provider, :api_key, :model, :max_tokens, :temperature])
+      |> Keyword.put(
+        :system,
+        build_system_prompt(capabilities, pattern_manifest, workspace_context)
+      )
+
+    case LLM.chat(prompt, [create_workspace_plan_schema(pattern_manifest)], context, llm_opts) do
       {:ok, tool_calls} ->
         select_plan_tool_call(tool_calls)
 

@@ -20,8 +20,7 @@ defmodule ResonanceDemo.CRM.Resolver do
     datasets: [
       %{
         name: "companies",
-        description:
-          "Accounts with industry, size, revenue, and region attributes.",
+        description: "Accounts with industry, size, revenue, and region attributes.",
         fields: ~w(name industry size revenue region),
         measures: ["count(*)", "sum(revenue)", "avg(revenue)"],
         dimensions: ~w(name industry region size),
@@ -55,13 +54,16 @@ defmodule ResonanceDemo.CRM.Resolver do
       },
       %{
         name: "deals",
-        description:
-          "Sales opportunities with value, stage, close quarter, owner, and company.",
+        description: "Sales opportunities with value, stage, close quarter, owner, and company.",
         fields: ~w(name value stage close_date owner quarter company_id),
         measures: ["count(*)", "sum(value)", "avg(value)"],
         dimensions: ~w(name stage quarter owner),
         filters: [
-          %{field: "stage", ops: ["="], values: ~w(prospecting discovery proposal negotiation closed_won closed_lost)},
+          %{
+            field: "stage",
+            ops: ["=", "in", "not_in"],
+            values: ~w(prospecting discovery proposal negotiation closed_won closed_lost)
+          },
           %{field: "quarter", ops: ["="]},
           %{field: "owner", ops: ["="], values: ~w(Alice Bob Carol Dave)}
         ],
@@ -369,10 +371,24 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   defp apply_deal_filters(query, filters) do
     Enum.reduce(filters, query, fn
-      %{field: "stage", op: "=", value: v}, q -> where(q, [d], d.stage == ^v)
-      %{field: "quarter", op: "=", value: v}, q -> where(q, [d], d.quarter == ^v)
-      %{field: "owner", op: "=", value: v}, q -> where(q, [d], d.owner == ^v)
-      filter, q -> log_unsupported_filter("deals", filter); q
+      %{field: "stage", op: "=", value: v}, q ->
+        where(q, [d], d.stage == ^v)
+
+      %{field: "stage", op: "in", value: values}, q when is_list(values) ->
+        where(q, [d], d.stage in ^values)
+
+      %{field: "stage", op: "not_in", value: values}, q when is_list(values) ->
+        where(q, [d], d.stage not in ^values)
+
+      %{field: "quarter", op: "=", value: v}, q ->
+        where(q, [d], d.quarter == ^v)
+
+      %{field: "owner", op: "=", value: v}, q ->
+        where(q, [d], d.owner == ^v)
+
+      filter, q ->
+        log_unsupported_filter("deals", filter)
+        q
     end)
   end
 
@@ -381,10 +397,18 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   defp apply_company_filters(query, filters) do
     Enum.reduce(filters, query, fn
-      %{field: "industry", op: "=", value: v}, q -> where(q, [c], c.industry == ^v)
-      %{field: "region", op: "=", value: v}, q -> where(q, [c], c.region == ^v)
-      %{field: "size", op: "=", value: v}, q -> where(q, [c], c.size == ^v)
-      filter, q -> log_unsupported_filter("companies", filter); q
+      %{field: "industry", op: "=", value: v}, q ->
+        where(q, [c], c.industry == ^v)
+
+      %{field: "region", op: "=", value: v}, q ->
+        where(q, [c], c.region == ^v)
+
+      %{field: "size", op: "=", value: v}, q ->
+        where(q, [c], c.size == ^v)
+
+      filter, q ->
+        log_unsupported_filter("companies", filter)
+        q
     end)
   end
 
@@ -393,8 +417,12 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   defp apply_contact_filters(query, filters) do
     Enum.reduce(filters, query, fn
-      %{field: "stage", op: "=", value: v}, q -> where(q, [c], c.stage == ^v)
-      filter, q -> log_unsupported_filter("contacts", filter); q
+      %{field: "stage", op: "=", value: v}, q ->
+        where(q, [c], c.stage == ^v)
+
+      filter, q ->
+        log_unsupported_filter("contacts", filter)
+        q
     end)
   end
 
@@ -403,9 +431,15 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   defp apply_activity_filters(query, filters) do
     Enum.reduce(filters, query, fn
-      %{field: "type", op: "=", value: v}, q -> where(q, [a], a.type == ^v)
-      %{field: "outcome", op: "=", value: v}, q -> where(q, [a], a.outcome == ^v)
-      filter, q -> log_unsupported_filter("activities", filter); q
+      %{field: "type", op: "=", value: v}, q ->
+        where(q, [a], a.type == ^v)
+
+      %{field: "outcome", op: "=", value: v}, q ->
+        where(q, [a], a.outcome == ^v)
+
+      filter, q ->
+        log_unsupported_filter("activities", filter)
+        q
     end)
   end
 
@@ -425,8 +459,13 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   # For ungrouped queries where we need to sort by the actual column
   defp apply_sort_by_field(query, nil, _field), do: query
-  defp apply_sort_by_field(query, %{direction: :desc}, field), do: order_by(query, [s], desc: ^field)
-  defp apply_sort_by_field(query, %{direction: :asc}, field), do: order_by(query, [s], asc: ^field)
+
+  defp apply_sort_by_field(query, %{direction: :desc}, field),
+    do: order_by(query, [s], desc: ^field)
+
+  defp apply_sort_by_field(query, %{direction: :asc}, field),
+    do: order_by(query, [s], asc: ^field)
+
   defp apply_sort_by_field(query, _, _field), do: query
 
   defp apply_limit(query, nil), do: query

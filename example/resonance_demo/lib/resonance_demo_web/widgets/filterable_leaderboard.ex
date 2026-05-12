@@ -147,7 +147,9 @@ defmodule ResonanceDemoWeb.Widgets.FilterableLeaderboard do
               <span class="text-xs font-mono text-gray-400 w-6">{idx}.</span>
               <span class="text-sm text-gray-900 truncate">{row_label(row)}</span>
             </div>
-            <span class="text-sm font-medium text-gray-700 tabular-nums">${format_value(row_value(row))}</span>
+            <span class="text-sm font-medium text-gray-700 tabular-nums">
+              ${format_value(row_value(row))}
+            </span>
           </li>
         <% end %>
         <li :if={@rows == []} class="text-sm text-gray-400 italic px-2 py-3">

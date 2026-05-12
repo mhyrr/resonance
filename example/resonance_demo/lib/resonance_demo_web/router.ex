@@ -20,6 +20,7 @@ defmodule ResonanceDemoWeb.Router do
     get("/", PageController, :home)
     live("/explore", ExploreLive)
     live("/workspace", WorkspaceLive)
+    live("/planner-eval", PlannerEvalLive)
   end
 
   scope "/" do

@@ -2,6 +2,7 @@ defmodule Resonance.Resolver.CapabilitiesTest do
   use ExUnit.Case, async: true
 
   alias Resonance.QueryIntent
+  alias Resonance.LLM.ToolCall
   alias Resonance.Resolver.Capabilities
 
   describe "normalize/1" do
@@ -70,6 +71,32 @@ defmodule Resonance.Resolver.CapabilitiesTest do
       assert Enum.any?(errors, &match?(%{code: :unsupported_dimension}, &1))
       assert Enum.any?(errors, &match?(%{code: :unsupported_filter}, &1))
       assert Enum.any?(errors, &match?(%{code: :unsupported_query_shape}, &1))
+    end
+  end
+
+  describe "validate_tool_call/3" do
+    test "returns an invalid query-intent error for map-keyed filters" do
+      tool_call = %ToolCall{
+        id: "call_bad_filters",
+        name: "rank_entities",
+        arguments: %{
+          "dataset" => "deals",
+          "measures" => ["sum(value)"],
+          "dimensions" => ["name"],
+          "filters" => %{
+            "stage" => %{"op" => "in", "value" => ["proposal", "negotiation"]}
+          }
+        }
+      }
+
+      assert {:error, [error]} =
+               Capabilities.validate_tool_call(tool_call, crm_capabilities(),
+                 path: [:sections, "bad", :source, :tool_call]
+               )
+
+      assert error.code == :invalid_query_intent
+      assert error.path == [:sections, "bad", :source, :tool_call, :arguments]
+      assert error.details.reason == {:invalid_field, :filters, "must be a list"}
     end
   end
 

@@ -11,7 +11,7 @@ defmodule Resonance.WorkspaceCompiler do
   report pipeline already knows how to display.
   """
 
-  alias Resonance.{Composer, Patterns, Renderable, WorkspacePlan}
+  alias Resonance.{Composer, Patterns, Registry, Renderable, Resolver, WorkspacePlan}
   alias Resonance.LLM.ToolCall
   alias Resonance.WorkspacePlan.Section
 
@@ -35,8 +35,8 @@ defmodule Resonance.WorkspaceCompiler do
   @spec compile(WorkspacePlan.t(), map()) ::
           {:ok, compiled_workspace()} | {:error, {:validation_failed, [map()]}}
   def compile(%WorkspacePlan{} = plan, context \\ %{}) when is_map(context) do
-    with {:ok, validated_plan} <-
-           WorkspacePlan.validate(plan, patterns: Patterns.from_context(context)) do
+    with {:ok, validation_opts} <- validation_opts(context),
+         {:ok, validated_plan} <- WorkspacePlan.validate(plan, validation_opts) do
       compiled_sections =
         Enum.map(validated_plan.sections, fn section ->
           compile_section(validated_plan, section, context)
@@ -92,6 +92,27 @@ defmodule Resonance.WorkspaceCompiler do
       section: section,
       renderable: renderable
     }
+  end
+
+  defp validation_opts(context) do
+    pattern_opts = [patterns: Patterns.from_context(context)]
+
+    resolver = context[:resolver] || context["resolver"]
+
+    case Resolver.capabilities(resolver) do
+      {:ok, %{datasets: datasets} = capabilities} when is_list(datasets) and datasets != [] ->
+        {:ok,
+         Keyword.merge(pattern_opts,
+           capabilities: capabilities,
+           primitive_names: Registry.list()
+         )}
+
+      {:ok, _capabilities} ->
+        {:ok, pattern_opts}
+
+      {:error, _reason} = error ->
+        error
+    end
   end
 
   defp identity_part(%{id: id}), do: id

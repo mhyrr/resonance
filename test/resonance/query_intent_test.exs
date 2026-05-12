@@ -77,6 +77,17 @@ defmodule Resonance.QueryIntentTest do
       assert {:error, _} = QueryIntent.from_params(%{"measures" => ["count(*)"]})
     end
 
+    test "rejects filter maps keyed by field name without crashing" do
+      params = %{
+        "dataset" => "deals",
+        "measures" => ["sum(value)"],
+        "filters" => %{"stage" => %{"op" => "in", "value" => ["proposal"]}}
+      }
+
+      assert {:error, {:invalid_field, :filters, "must be a list"}} =
+               QueryIntent.from_params(params)
+    end
+
     test "normalizes sort direction 'asc' to :asc" do
       params = %{
         "dataset" => "deals",

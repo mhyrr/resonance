@@ -74,6 +74,16 @@ defmodule Resonance.Planner.EvalTest do
     end
   end
 
+  defmodule FailingResolver do
+    @behaviour Resonance.Resolver
+
+    @impl true
+    def describe, do: CRMResolver.describe()
+
+    @impl true
+    def resolve(_intent, _context), do: {:error, :database_down}
+  end
+
   defmodule EvalProvider do
     @behaviour Resonance.LLM.Provider
 
@@ -105,19 +115,7 @@ defmodule Resonance.Planner.EvalTest do
   end
 
   setup do
-    old_provider = Application.get_env(:resonance, :provider)
-    old_model = Application.get_env(:resonance, :model)
-
-    Application.put_env(:resonance, :provider, EvalProvider)
-    Application.put_env(:resonance, :model, "planner-eval-test")
-
-    on_exit(fn ->
-      restore_env(:provider, old_provider)
-      restore_env(:model, old_model)
-      Process.delete(:planner_eval_outputs)
-    end)
-
-    :ok
+    on_exit(fn -> Process.delete(:planner_eval_outputs) end)
   end
 
   test "evaluates ten CRM prompts through provider, planner validation, and compiler" do
@@ -128,7 +126,7 @@ defmodule Resonance.Planner.EvalTest do
 
     Process.put(:planner_eval_outputs, outputs)
 
-    evaluation = Eval.evaluate(@crm_prompts, %{resolver: CRMResolver})
+    evaluation = Eval.evaluate(@crm_prompts, %{resolver: CRMResolver}, provider: EvalProvider)
 
     assert evaluation.summary.total == 10
     assert evaluation.summary.valid_plans == 10
@@ -136,10 +134,14 @@ defmodule Resonance.Planner.EvalTest do
     assert evaluation.summary.invalid_plans == 0
     assert evaluation.summary.retried == 0
     assert evaluation.summary.recovered == 0
+    assert evaluation.summary.invented_capability_failures == 0
+    assert evaluation.summary.invented_pattern_failures == 0
+    assert evaluation.summary.invented_primitive_failures == 0
     assert evaluation.summary.compile_rate == 1.0
     assert Enum.all?(evaluation.results, &(&1.status == :compiled))
     assert Enum.all?(evaluation.results, &(length(&1.compiled.renderables) > 0))
     assert Enum.all?(evaluation.results, &(&1.attempts == 1))
+    assert Enum.all?(evaluation.results, &(&1.diagnostics.section_count > 0))
   end
 
   test "records actionable validation errors for invalid planner output" do
@@ -157,14 +159,20 @@ defmodule Resonance.Planner.EvalTest do
         ])
     })
 
-    evaluation = Eval.evaluate([prompt], %{resolver: CRMResolver}, max_validation_retries: 0)
+    evaluation =
+      Eval.evaluate([prompt], %{resolver: CRMResolver},
+        provider: EvalProvider,
+        max_validation_retries: 0
+      )
 
     assert evaluation.summary.total == 1
     assert evaluation.summary.invalid_plans == 1
     assert evaluation.summary.retried == 0
+    assert evaluation.summary.invented_capability_failures == 1
     [result] = evaluation.results
     assert result.status == :invalid_plan
     assert result.attempts == 1
+    assert result.diagnostics.invented_capability?
     assert {:validation_failed, errors} = result.errors
     assert Enum.any?(errors, &match?(%{code: :unsupported_measure}, &1))
   end
@@ -191,7 +199,7 @@ defmodule Resonance.Planner.EvalTest do
       ])
     ])
 
-    evaluation = Eval.evaluate([prompt], %{resolver: CRMResolver})
+    evaluation = Eval.evaluate([prompt], %{resolver: CRMResolver}, provider: EvalProvider)
 
     assert evaluation.summary.total == 1
     assert evaluation.summary.compiled == 1
@@ -229,7 +237,10 @@ defmodule Resonance.Planner.EvalTest do
         ])
     })
 
-    evaluation = Eval.evaluate([prompt], %{resolver: CRMResolver, patterns: crm_patterns()})
+    evaluation =
+      Eval.evaluate([prompt], %{resolver: CRMResolver, patterns: crm_patterns()},
+        provider: EvalProvider
+      )
 
     assert evaluation.summary.total == 1
     assert evaluation.summary.compiled == 1
@@ -237,6 +248,34 @@ defmodule Resonance.Planner.EvalTest do
     [result] = evaluation.results
     assert result.status == :compiled
     assert [%{pattern: :deal_focus_list}] = result.compiled.sections
+  end
+
+  test "does not count section-local error renderables as compiled eval success" do
+    prompt = "Show open pipeline by owner."
+
+    Process.put(:planner_eval_outputs, %{
+      prompt =>
+        plan_map("resolver_failure", [
+          section_map("owner_pipeline", "segment_population", %{
+            "dataset" => "deals",
+            "measures" => ["sum(value)"],
+            "dimensions" => ["owner"],
+            "title" => "Pipeline by owner"
+          })
+        ])
+    })
+
+    evaluation = Eval.evaluate([prompt], %{resolver: FailingResolver}, provider: EvalProvider)
+
+    assert evaluation.summary.total == 1
+    assert evaluation.summary.compiled == 0
+    assert evaluation.summary.compile_failed == 1
+
+    [result] = evaluation.results
+    assert result.status == :compile_failed
+
+    assert {:renderable_errors, [%{section_id: "owner_pipeline", error: :database_down}]} =
+             result.errors
   end
 
   defp plan_for(prompt, index) do
@@ -367,9 +406,6 @@ defmodule Resonance.Planner.EvalTest do
       "interactions" => ["filter"]
     }
   end
-
-  defp restore_env(key, nil), do: Application.delete_env(:resonance, key)
-  defp restore_env(key, value), do: Application.put_env(:resonance, key, value)
 
   defp crm_patterns do
     [

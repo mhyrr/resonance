@@ -31,10 +31,15 @@ defmodule Resonance.LLM do
           {:ok, [Resonance.LLM.ToolCall.t()]} | {:error, term()}
   def chat(prompt, tools, context \\ %{}, call_opts \\ []) do
     config = Application.get_all_env(:resonance)
-    provider = resolve_provider(config[:provider])
+    provider = resolve_provider(Keyword.get(call_opts, :provider, config[:provider]))
 
     system_prompt = Keyword.get(call_opts, :system) || build_system_prompt(context)
-    opts = config |> Keyword.drop([:provider]) |> Keyword.put(:system, system_prompt)
+
+    opts =
+      config
+      |> Keyword.drop([:provider])
+      |> Keyword.merge(Keyword.drop(call_opts, [:provider, :system]))
+      |> Keyword.put(:system, system_prompt)
 
     metadata = %{provider: provider, tool_count: length(tools)}
 

@@ -1,0 +1,1402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Resonance — Declare the grammar. Discover the page.</title>
+<meta name="description" content="An application has a grammar of what it can do. A user has an intent they can't fully articulate. Resonance is the typed surface where the model maps between them — and the right page is discovered, not designed." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Newsreader:opsz,ital,wght@6..72,0..1,200..800&family=JetBrains+Mono:wght@300..700&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    /* dark coal + bone + cadmium yellow */
+    --bg:       #14110C;
+    --bg-1:     #1B1812;
+    --bg-2:     #211D16;
+    --bg-deep:  #0A0907;
+    --paper:    #EFE5D0;
+    --paper-2:  #D6CBB2;
+    --paper-mute: #8A8170;
+    --paper-soft: #5F5849;
+    --rule:     #322C22;
+    --rule-2:   #4A4231;
+    --orange:   #D8651D;
+    --orange-2: #E27420;
+    --orange-d: #6E3210;
+    --warn:     #FF6B35;
+
+    --serif-display: "Fraunces", "Times New Roman", serif;
+    --serif-body:    "Newsreader", "Georgia", serif;
+    --mono:          "JetBrains Mono", "Menlo", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--paper);
+    font-family: var(--serif-body);
+    font-optical-sizing: auto;
+    font-weight: 380;
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* paper grain on coal */
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(242, 194, 0, 0.025), transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(239, 229, 208, 0.02), transparent 55%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 0.95 0 0 0 0 0.85 0 0 0 0.03 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    background-attachment: fixed, fixed, fixed;
+  }
+
+  ::selection { background: var(--orange); color: var(--bg); }
+
+  /* ---------- frame chrome ---------- */
+  .frame-top, .frame-bot {
+    position: fixed; left: 0; right: 0;
+    z-index: 20;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 28px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+    pointer-events: none;
+  }
+  .frame-top { top: 0; border-bottom: 1px solid var(--rule); background: linear-gradient(to bottom, rgba(20,17,12,0.94), rgba(20,17,12,0.7) 80%, transparent); }
+  .frame-bot { bottom: 0; border-top: 1px solid var(--rule); background: linear-gradient(to top, rgba(20,17,12,0.94), rgba(20,17,12,0.7) 80%, transparent); }
+
+  .frame-top .left, .frame-top .right,
+  .frame-bot .left, .frame-bot .right { pointer-events: auto; }
+
+  .wordmark {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 30, "WONK" 1;
+    font-style: italic;
+    font-weight: 480;
+    color: var(--paper);
+    font-size: 18px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .wordmark .dot {
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--orange);
+    transform: rotate(45deg);
+    vertical-align: middle;
+    margin: 0 0.55em 4px 0;
+  }
+  .wordmark em { font-style: italic; color: var(--orange); }
+
+  .counter { color: var(--paper); }
+  .counter .cur { color: var(--orange); }
+  .counter .sep { color: var(--paper-soft); margin: 0 0.4em; }
+
+  .nav-hint {
+    display: flex; align-items: center; gap: 14px;
+    color: var(--paper-mute);
+  }
+  .nav-hint .keys {
+    display: inline-flex; gap: 4px;
+  }
+  .nav-hint .key {
+    display: inline-flex; width: 16px; height: 16px;
+    align-items: center; justify-content: center;
+    border: 1px solid var(--rule-2);
+    font-size: 10px;
+    color: var(--paper-2);
+  }
+
+  .section-eyebrow {
+    color: var(--paper);
+  }
+  .section-eyebrow .lab { color: var(--orange); }
+
+  /* ---------- deck ---------- */
+  .deck {
+    height: 100vh;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+  }
+  .deck::-webkit-scrollbar { display: none; }
+
+  .slide {
+    position: relative;
+    min-height: 100vh;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    padding: 92px 6vw 84px;
+    display: grid;
+    place-items: center;
+  }
+
+  .slide-inner {
+    width: 100%;
+    max-width: 1180px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* tag/eyebrow inside slide */
+  .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 1.4rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .tag::before {
+    content: "";
+    display: inline-block;
+    width: 22px; height: 1px;
+    background: var(--orange);
+  }
+
+  /* typography */
+  h1, h2, h3, h4 {
+    font-family: var(--serif-display);
+    font-optical-sizing: auto;
+    color: var(--paper);
+    margin: 0;
+    line-height: 0.96;
+    text-wrap: balance;
+  }
+
+  .display {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1;
+    font-weight: 440;
+    font-size: clamp(2.8rem, 8.4vw, 8.2rem);
+    line-height: 0.92;
+    letter-spacing: -0.028em;
+  }
+  .display em {
+    font-style: italic;
+    font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1;
+    color: var(--orange);
+    font-weight: 420;
+  }
+
+  .h-slide {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 96, "SOFT" 30, "WONK" 0;
+    font-weight: 540;
+    font-size: clamp(1.9rem, 4.4vw, 3.4rem);
+    line-height: 1.02;
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
+  .h-slide em {
+    font-style: italic;
+    font-variation-settings: "opsz" 96, "SOFT" 100, "WONK" 1;
+    color: var(--orange);
+  }
+
+  .h-slide + .dek,
+  .h-slide + .lede,
+  .h-slide + .body { margin-top: 1.6rem; }
+
+  .dek {
+    font-family: var(--serif-body);
+    font-style: italic;
+    font-weight: 380;
+    font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+    line-height: 1.45;
+    color: var(--paper-2);
+    text-wrap: balance;
+    max-width: 56ch;
+  }
+
+  .lede {
+    font-family: var(--serif-body);
+    font-weight: 400;
+    font-size: clamp(1.05rem, 1.5vw, 1.22rem);
+    line-height: 1.5;
+    color: var(--paper);
+    text-wrap: pretty;
+    max-width: 60ch;
+  }
+
+  .body, .body p {
+    font-family: var(--serif-body);
+    font-weight: 380;
+    font-size: clamp(0.98rem, 1.25vw, 1.08rem);
+    line-height: 1.55;
+    color: var(--paper-2);
+    text-wrap: pretty;
+    max-width: 64ch;
+  }
+  .body p { margin: 0 0 0.9em 0; }
+  .body p:last-child { margin-bottom: 0; }
+  .body em { color: var(--paper); font-style: italic; }
+  .body strong { color: var(--paper); font-weight: 600; }
+  .body .yk { color: var(--orange); font-weight: 500; font-style: normal; }
+  .body code, .mono-inline {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    color: var(--paper);
+    background: var(--bg-1);
+    border: 1px solid var(--rule);
+    padding: 1px 6px;
+  }
+
+  /* axiom */
+  .axiom {
+    position: relative;
+    margin-top: 2.4rem;
+    padding-left: 28px;
+    border-left: 3px solid var(--orange);
+    max-width: 56ch;
+  }
+  .axiom .axiom-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 0.7rem;
+  }
+  .axiom .axiom-body {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 96, "SOFT" 70, "WONK" 0;
+    font-style: italic;
+    font-weight: 380;
+    font-size: clamp(1.45rem, 2.9vw, 2.3rem);
+    line-height: 1.08;
+    letter-spacing: -0.012em;
+    color: var(--paper);
+    text-wrap: balance;
+  }
+  .axiom .axiom-body em { color: var(--orange); }
+
+  /* term definition box */
+  .term {
+    margin-top: 1.6rem;
+    padding: 16px 22px;
+    border: 1px solid var(--rule-2);
+    background: var(--bg-1);
+    max-width: 64ch;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 18px;
+    align-items: baseline;
+  }
+  .term .term-lab {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--orange);
+    white-space: nowrap;
+  }
+  .term .term-body {
+    font-family: var(--serif-body);
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--paper-2);
+  }
+  .term .term-body strong { color: var(--paper); font-weight: 600; }
+
+  /* ============ HERO ============ */
+  .hero .display { max-width: 17ch; }
+  .hero-foot {
+    margin-top: 2.8rem;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    flex-wrap: wrap; gap: 1.4rem;
+  }
+  .hero-foot .dek { margin: 0; max-width: 38ch; }
+  .hero-meta {
+    display: flex; flex-direction: column; gap: 4px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+    text-align: right;
+  }
+  .hero-meta .v { color: var(--orange); }
+
+  /* ============ PHASE TABLE (slide 3) — BOLD REBUILD ============ */
+  .phases {
+    margin-top: 2rem;
+    display: grid;
+    grid-template-columns: 1fr 36px 1fr;
+    column-gap: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .phases .ph-row { display: contents; }
+  .phases .ph-l, .phases .ph-r, .phases .ph-arrow {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center;
+  }
+  .phases .ph-arrow {
+    padding: 0; justify-content: center;
+    border-bottom: 1px solid var(--rule);
+    color: var(--orange);
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+  .phases .ph-l {
+    flex-direction: column; align-items: flex-start; gap: 4px;
+  }
+  .phases .ph-l .name {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 40, "WONK" 0;
+    font-weight: 580;
+    font-size: clamp(1.4rem, 2.4vw, 1.85rem);
+    color: var(--paper);
+    line-height: 1.0;
+    letter-spacing: -0.01em;
+  }
+  .phases .ph-l .sub {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    color: var(--paper-mute);
+    text-transform: uppercase;
+  }
+  .phases .ph-r {
+    justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+  }
+  .phases .ph-r .what {
+    font-family: var(--mono);
+    font-size: clamp(0.92rem, 1.2vw, 1.05rem);
+    color: var(--paper);
+    letter-spacing: 0;
+    line-height: 1.3;
+  }
+  .phases .ph-r .what em {
+    color: var(--orange);
+    font-style: italic;
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 100, "WONK" 1;
+    font-weight: 500;
+  }
+  .phases .det {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    white-space: nowrap;
+  }
+  .phases .det.opaque {
+    background: var(--paper);
+    color: var(--bg);
+  }
+  .phases .det.glass {
+    background: transparent;
+    color: var(--orange);
+    border: 1px solid var(--orange);
+  }
+
+  .phases-head {
+    display: grid;
+    grid-template-columns: 1fr 36px 1fr;
+    margin-top: 2.2rem;
+    align-items: baseline;
+  }
+  .phases-head .hl {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1;
+    font-weight: 460;
+    font-size: clamp(3rem, 8vw, 6.6rem);
+    line-height: 0.9;
+    color: var(--paper);
+    letter-spacing: -0.03em;
+  }
+  .phases-head .hl em {
+    font-style: italic;
+    color: var(--orange);
+    font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1;
+  }
+  .phases-head .hl-arrow {
+    text-align: center;
+    color: var(--orange);
+    font-family: var(--mono);
+    font-size: 22px;
+    align-self: center;
+  }
+
+  @media (max-width: 720px) {
+    .phases, .phases-head { grid-template-columns: 1fr; }
+    .phases .ph-arrow { display: none; }
+    .phases-head .hl-arrow { display: none; }
+    .phases-head .hl { font-size: 2.4rem; }
+  }
+
+  /* ============ Intelligence diagram ============ */
+  .stack {
+    margin-top: 2.4rem;
+    border: 1px solid var(--rule-2);
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    max-width: 880px;
+  }
+  .stack .band {
+    border-bottom: 1px solid var(--rule);
+    padding: 22px 22px;
+    display: flex; align-items: center; gap: 22px;
+  }
+  .stack > div:nth-last-child(-n+2) { border-bottom: 0; }
+  .stack .lab {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    padding: 22px 18px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center;
+  }
+  .stack .lab.opaque { background: var(--paper); color: var(--bg); }
+  .stack .lab.glass  { background: var(--bg); color: var(--orange); border-right-color: var(--rule-2); }
+  .stack .row {
+    display: flex; align-items: center; gap: 18px;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    color: var(--paper-2);
+  }
+  .stack .row .step {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 80, "WONK" 1;
+    font-style: italic;
+    font-weight: 460;
+    font-size: 1.45rem;
+    color: var(--paper);
+  }
+  .stack .row .step em { color: var(--orange); font-style: italic; }
+  .stack .row .arr { color: var(--orange); }
+
+  @media (max-width: 720px) {
+    .stack { grid-template-columns: 1fr; }
+    .stack .lab { border-right: 0; }
+  }
+
+  /* ============ Plan tree ============ */
+  .plan-frame {
+    margin-top: 1.8rem;
+    border: 1px solid var(--rule-2);
+    background: var(--bg-deep);
+    overflow: hidden;
+  }
+  .plan-titlebar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+  }
+  .plan-titlebar .tag-cmd { color: var(--orange); }
+  .plan-titlebar .dots {
+    display: inline-flex; gap: 6px;
+  }
+  .plan-titlebar .dots span {
+    width: 7px; height: 7px;
+    border: 1px solid var(--rule-2);
+  }
+  .plan-body {
+    padding: 18px 22px 22px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .plan-body pre {
+    margin: 0;
+    color: var(--paper);
+    font-family: inherit;
+  }
+  .plan-line {
+    display: block;
+    white-space: pre;
+    opacity: 0;
+    transform: translateY(5px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .visible .plan-line { opacity: 1; transform: none; }
+  .visible .plan-line { transition-delay: calc(var(--i, 0) * 38ms); }
+
+  .pl-mute { color: var(--paper-soft); }
+  .pl-key { color: var(--paper-2); }
+  .pl-accent { color: var(--orange); }
+  .pl-bound { color: #BFD68A; }
+
+  .plan-foot {
+    display: flex; flex-wrap: wrap; gap: 1.8rem;
+    padding: 12px 22px 14px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--paper-mute);
+    letter-spacing: 0.04em;
+  }
+  .plan-foot .pf-val { color: var(--paper); }
+  .plan-foot .pf-val.accent { color: var(--orange); }
+
+  /* ============ MPC poster (slide 6) ============ */
+  .mpc-poster {
+    margin-top: 2.4rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .mpc-poster .card {
+    padding: 36px 24px 30px;
+    border-right: 1px solid var(--rule);
+    text-align: center;
+    position: relative;
+  }
+  .mpc-poster .card:last-child { border-right: 0; }
+  .mpc-poster .glyph {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1;
+    font-weight: 380;
+    font-style: italic;
+    font-size: clamp(7rem, 14vw, 13rem);
+    line-height: 0.82;
+    color: var(--orange);
+  }
+  .mpc-poster .role {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+    margin-top: 0.8rem;
+  }
+  .mpc-poster .word {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 50, "WONK" 0;
+    font-weight: 560;
+    font-size: clamp(1.4rem, 2.6vw, 1.95rem);
+    color: var(--paper);
+    margin: 0.4rem 0 0.8rem;
+  }
+  .mpc-poster .one-line {
+    font-family: var(--serif-body);
+    font-style: italic;
+    font-size: 1rem;
+    line-height: 1.4;
+    color: var(--paper-2);
+    max-width: 26ch;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 820px) {
+    .mpc-poster { grid-template-columns: 1fr; }
+    .mpc-poster .card { border-right: 0; border-bottom: 1px solid var(--rule); }
+    .mpc-poster .card:last-child { border-bottom: 0; }
+  }
+
+  /* ============ M / P / C detail slides ============ */
+  .detail {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 56px;
+    align-items: start;
+  }
+  .detail .lhs {
+    position: sticky; top: 0;
+  }
+  .detail .big-glyph {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1;
+    font-weight: 380;
+    font-style: italic;
+    font-size: clamp(10rem, 20vw, 18rem);
+    line-height: 0.8;
+    color: var(--orange);
+    letter-spacing: -0.03em;
+  }
+  .detail .big-glyph-word {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 96, "SOFT" 60, "WONK" 0;
+    font-weight: 520;
+    font-size: clamp(2rem, 4vw, 3rem);
+    color: var(--paper);
+    margin-top: 0.4rem;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .detail .lhs .role {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+    margin-top: 1.2rem;
+  }
+  .detail .rhs {
+    padding-top: 12px;
+  }
+  .detail .rhs .lede { margin-bottom: 1.2rem; }
+  .detail .ex {
+    margin-top: 1.4rem;
+    border: 1px solid var(--rule-2);
+    background: var(--bg-deep);
+  }
+  .detail .ex-head {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+  }
+  .detail .ex-head .y { color: var(--orange); }
+  .detail .ex-body {
+    padding: 14px 16px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--paper);
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .detail .ex-body .c-mute { color: var(--paper-soft); }
+  .detail .ex-body .c-key { color: var(--paper-2); }
+  .detail .ex-body .c-y { color: var(--orange); }
+
+  @media (max-width: 880px) {
+    .detail { grid-template-columns: 1fr; gap: 24px; }
+    .detail .big-glyph { font-size: 7rem; }
+  }
+
+  /* ============ canon ============ */
+  .canon-list {
+    margin-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  .canon-row {
+    display: grid;
+    grid-template-columns: 220px 1fr auto;
+    gap: 28px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: baseline;
+  }
+  .canon-row .when {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+  }
+  .canon-row .what {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 50, "WONK" 0;
+    font-weight: 520;
+    font-size: clamp(1.15rem, 2.2vw, 1.5rem);
+    line-height: 1.25;
+    color: var(--paper);
+    text-wrap: balance;
+  }
+  .canon-row .what em {
+    color: var(--orange);
+    font-style: italic;
+    font-variation-settings: "opsz" 60, "SOFT" 100, "WONK" 1;
+  }
+  .canon-row .acronym {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--orange);
+    letter-spacing: 0.04em;
+  }
+  @media (max-width: 720px) {
+    .canon-row { grid-template-columns: 1fr; gap: 6px; padding: 16px 0; }
+    .canon-row .acronym { font-size: 12px; }
+  }
+
+  /* ============ closing ============ */
+  .closing-build {
+    display: grid; gap: 1.2rem;
+    max-width: 60ch;
+  }
+  .closing-build .line {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 96, "SOFT" 60, "WONK" 0;
+    font-style: italic;
+    font-weight: 440;
+    font-size: clamp(1.4rem, 3vw, 2.1rem);
+    line-height: 1.15;
+    color: var(--paper-2);
+    text-wrap: balance;
+  }
+  .closing-build .line em { color: var(--orange); font-style: italic; }
+  .closing-final {
+    margin-top: 2rem;
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1;
+    font-style: italic;
+    font-weight: 380;
+    font-size: clamp(2.4rem, 7vw, 5.6rem);
+    line-height: 0.94;
+    letter-spacing: -0.028em;
+    color: var(--paper);
+    text-wrap: balance;
+  }
+  .closing-final em { color: var(--orange); }
+  .closing-links {
+    margin-top: 2.6rem;
+    display: flex; gap: 28px; flex-wrap: wrap;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .closing-links a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 2px;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  .closing-links a:hover { color: var(--orange); border-bottom-color: var(--orange); }
+
+  /* ============ reveal animation ============ */
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+                transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .visible.reveal, .visible .reveal { opacity: 1; transform: none; }
+
+  .stagger > * {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .visible .stagger > * { opacity: 1; transform: none; }
+  .visible .stagger > *:nth-child(1) { transition-delay: 80ms; }
+  .visible .stagger > *:nth-child(2) { transition-delay: 160ms; }
+  .visible .stagger > *:nth-child(3) { transition-delay: 240ms; }
+  .visible .stagger > *:nth-child(4) { transition-delay: 320ms; }
+  .visible .stagger > *:nth-child(5) { transition-delay: 400ms; }
+  .visible .stagger > *:nth-child(6) { transition-delay: 480ms; }
+  .visible .stagger > *:nth-child(7) { transition-delay: 560ms; }
+  .visible .stagger > *:nth-child(8) { transition-delay: 640ms; }
+
+  /* hero word stagger */
+  .hero h1 .w {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(16px);
+    animation: rise 0.85s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .hero h1 .w:nth-child(1) { animation-delay: 0.20s; }
+  .hero h1 .w:nth-child(2) { animation-delay: 0.32s; }
+  .hero h1 .w:nth-child(3) { animation-delay: 0.44s; }
+  .hero h1 .w:nth-child(4) { animation-delay: 0.56s; }
+  .hero h1 .w:nth-child(5) { animation-delay: 0.68s; }
+  .hero h1 .w:nth-child(6) { animation-delay: 0.80s; }
+  .hero h1 .w:nth-child(7) { animation-delay: 0.94s; }
+  .hero h1 .w:nth-child(8) { animation-delay: 1.06s; }
+  .hero h1 .w:nth-child(9) { animation-delay: 1.18s; }
+
+  /* progress rail (slim dots on right edge) */
+  .rail {
+    position: fixed; right: 18px; top: 50%; transform: translateY(-50%);
+    z-index: 25;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .rail .dot {
+    width: 5px; height: 5px;
+    background: var(--rule-2);
+    border-radius: 0;
+    transform: rotate(45deg);
+    transition: background 0.2s ease, transform 0.2s ease;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .rail .dot.active { background: var(--orange); transform: rotate(45deg) scale(1.4); }
+  @media (max-width: 720px) { .rail { display: none; } }
+
+  /* skip motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+    .deck { scroll-behavior: auto; }
+    .reveal, .plan-line, .hero h1 .w, .stagger > * {
+      opacity: 1 !important; transform: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== frame chrome ===== -->
+<div class="frame-top">
+  <div class="left wordmark"><span class="dot" aria-hidden="true"></span>Resonance<em> · a proposal</em></div>
+  <div class="right counter">
+    <span class="cur" id="cur">01</span><span class="sep">/</span><span id="tot">11</span>
+  </div>
+</div>
+
+<div class="frame-bot">
+  <div class="left section-eyebrow" id="eyebrow"><span class="lab">·</span> &nbsp;the opening</div>
+  <div class="right nav-hint">
+    <span>navigate</span>
+    <span class="keys">
+      <span class="key">↑</span><span class="key">↓</span>
+    </span>
+  </div>
+</div>
+
+<div class="rail" id="rail" aria-hidden="true"></div>
+
+<!-- ===== deck ===== -->
+<main class="deck" id="deck">
+
+<!-- ============ 01 — HERO ============ -->
+<section class="slide hero" data-eyebrow="the opening">
+  <div class="slide-inner">
+    <h1 class="display">
+      <span class="w">The</span>
+      <span class="w">LLM</span>
+      <span class="w">doesn't</span>
+      <span class="w">write</span>
+      <span class="w">your</span>
+      <span class="w">UI.</span>
+      <span class="w"><em>It</em></span>
+      <span class="w"><em>plans</em></span>
+      <span class="w"><em>it.</em></span>
+    </h1>
+
+    <div class="hero-foot">
+      <p class="dek">
+        The database solved this shape of problem fifty years ago. We just transplanted the answer onto the screen.
+      </p>
+      <div class="hero-meta">
+        <span>A proposal &nbsp;<span class="v">·</span>&nbsp; 2026</span>
+        <span>Resonance — Elixir + Phoenix LiveView</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 — THE PROBLEM ============ -->
+<section class="slide" data-eyebrow="the problem">
+  <div class="slide-inner">
+    <div class="tag">02 · the problem</div>
+    <h2 class="h-slide">Every generative UI demo is missing the same thing.</h2>
+
+    <div class="body" style="margin-top: 1.6rem;">
+      <p class="lede">
+        The demo is always the same. The model emits markup. The browser renders it. The user sees it. Then ask one quiet question.
+      </p>
+      <p style="font-family: var(--serif-display); font-variation-settings: 'opsz' 96, 'SOFT' 90, 'WONK' 1; font-style: italic; font-size: clamp(1.4rem, 2.6vw, 1.95rem); color: var(--orange); margin: 1.2rem 0 1.4rem;">
+        Where is the plan?
+      </p>
+      <p>
+        There isn't one. Nothing in between catches a mistake. Nothing anchors identity. Nothing survives a refresh. Nothing diffs. Nothing replays. The intelligence and the rendering live in the same step, and you cannot pry them apart.
+      </p>
+    </div>
+
+    <div class="axiom">
+      <div class="axiom-tag">Premise 01</div>
+      <div class="axiom-body">Generative UI is a parlor trick.<br /><em>Selective</em> UI is a product.</div>
+    </div>
+
+    <div class="term">
+      <div class="term-lab">Selective UI</div>
+      <div class="term-body">
+        The model doesn't <strong>generate</strong> your interface. It <strong>picks</strong> one from a finite, typed grammar of what your application has declared it can do. A parser into your vocabulary, not an author of new ones.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 03 — PHASE MAPPING ============ -->
+<section class="slide" data-eyebrow="the frame">
+  <div class="slide-inner">
+    <div class="tag">03 · the frame</div>
+
+    <div class="phases-head">
+      <div class="hl">SQL</div>
+      <div class="hl-arrow">↦</div>
+      <div class="hl"><em>Resonance</em></div>
+    </div>
+
+    <div class="phases">
+
+      <div class="ph-row">
+        <div class="ph-l">
+          <div class="name">Parse</div>
+          <div class="sub">text → AST</div>
+        </div>
+        <div class="ph-arrow">↦</div>
+        <div class="ph-r">
+          <div class="what">Prompt → <em>tool call</em></div>
+          <div class="det opaque">opaque</div>
+        </div>
+      </div>
+
+      <div class="ph-row">
+        <div class="ph-l">
+          <div class="name">Bind</div>
+          <div class="sub">resolve names against the catalog</div>
+        </div>
+        <div class="ph-arrow">↦</div>
+        <div class="ph-r">
+          <div class="what">Validate against the <em>Manifest</em></div>
+          <div class="det glass">glass</div>
+        </div>
+      </div>
+
+      <div class="ph-row">
+        <div class="ph-l">
+          <div class="name">Logical plan</div>
+          <div class="sub">relational-algebra tree</div>
+        </div>
+        <div class="ph-arrow">↦</div>
+        <div class="ph-r">
+          <div class="what"><em>WorkspacePlan</em> · typed IR</div>
+          <div class="det glass">glass</div>
+        </div>
+      </div>
+
+      <div class="ph-row">
+        <div class="ph-l">
+          <div class="name">Optimize</div>
+          <div class="sub">cost-based, statistics-driven</div>
+        </div>
+        <div class="ph-arrow">↦</div>
+        <div class="ph-r">
+          <div class="what">(the same model call)</div>
+          <div class="det opaque">opaque</div>
+        </div>
+      </div>
+
+      <div class="ph-row">
+        <div class="ph-l">
+          <div class="name">Physical plan</div>
+          <div class="sub">operator tree, joins, scans</div>
+        </div>
+        <div class="ph-arrow">↦</div>
+        <div class="ph-r">
+          <div class="what"><em>Compiler</em> → Renderables</div>
+          <div class="det glass">glass</div>
+        </div>
+      </div>
+
+      <div class="ph-row">
+        <div class="ph-l">
+          <div class="name">Execute</div>
+          <div class="sub">iterators, tuples, results</div>
+        </div>
+        <div class="ph-arrow">↦</div>
+        <div class="ph-r">
+          <div class="what">Pipeline + Phoenix <em>LiveView</em></div>
+          <div class="det glass">glass</div>
+        </div>
+      </div>
+
+    </div>
+
+    <p class="body" style="margin-top: 1.4rem; font-size: 1rem;">
+      Six phases in the database. Six phases here. Four of ours are <span class="yk">glass</span> — typed, deterministic, debuggable. Two are <span class="yk">opaque</span> — and they're collapsed into a single model call, the way an optimizer is a single opaque box in a query planner.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 04 — INTELLIGENCE / DETERMINISM ============ -->
+<section class="slide" data-eyebrow="intelligence">
+  <div class="slide-inner">
+    <div class="tag">04 · intelligence</div>
+    <h2 class="h-slide">The model <em>is</em> the cost-based optimizer.</h2>
+
+    <div class="body" style="margin-top: 1.4rem;">
+      <p class="lede">
+        In SQL, the optimizer is the smart, opaque box. Statistics, heuristics, dynamic programming — picking a plan from a search space against an internal cost function.
+      </p>
+      <p>
+        In Resonance, the language model plays that role. Same job, different substrate. It selects a plan from a search space using learned representation in place of histograms, and a semantic cost function in place of latency. The mechanism is opaque. The role is identical.
+      </p>
+      <p>
+        Then the model gets out of the way. The plan is typed. The compiler is total over valid plans. The renderer is Phoenix. Everything downstream of the optimizer is <span class="yk">glass</span>.
+      </p>
+    </div>
+
+    <div class="stack">
+      <div class="lab opaque">Opaque</div>
+      <div class="band">
+        <div class="row">
+          <span>prompt</span>
+          <span class="arr">→</span>
+          <span class="step">optimizer (LLM)</span>
+          <span class="arr">→</span>
+          <span class="step"><em>WorkspacePlan</em></span>
+        </div>
+      </div>
+      <div class="lab glass">Glass</div>
+      <div class="band">
+        <div class="row">
+          <span class="step">plan</span>
+          <span class="arr">→</span>
+          <span>compile</span>
+          <span class="arr">→</span>
+          <span>renderables</span>
+          <span class="arr">→</span>
+          <span class="step">Phoenix LiveView</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="axiom">
+      <div class="axiom-tag">Premise 02</div>
+      <div class="axiom-body">One step is opaque.<br />The rest is <em>glass</em>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 — PLAN TREE ============ -->
+<section class="slide" data-eyebrow="the artifact">
+  <div class="slide-inner">
+    <div class="tag">05 · the artifact</div>
+    <h2 class="h-slide">An AI-shaped workspace — when you can <em>read</em> it.</h2>
+    <p class="dek" style="margin-top: 0.8rem;">
+      The model emitted this plan. The compiler validated it against the application's declared capabilities. Phoenix rendered it. Below: the same artifact, made legible.
+    </p>
+
+    <div class="plan-frame">
+      <div class="plan-titlebar">
+        <span><span class="tag-cmd">▸ EXPLAIN</span> &nbsp;·&nbsp; <span class="tag-cmd">ANALYZE</span> &nbsp;·&nbsp; workspace</span>
+        <span class="dots"><span></span><span></span><span></span></span>
+      </div>
+      <div class="plan-body">
+<pre><span class="plan-line" style="--i:0"><span class="pl-mute">workspace   </span><span class="pl-accent">crm:pipeline-review</span></span><span class="plan-line" style="--i:1"><span class="pl-mute">fingerprint </span>sha256:a91c·6f2b·d3e0·…   <span class="pl-mute">reruns</span> 3</span><span class="plan-line" style="--i:2"><span class="pl-mute">prompt      </span>"how is pipeline this quarter, who is stuck"</span><span class="plan-line" style="--i:3"></span><span class="plan-line" style="--i:4"><span class="pl-key">WorkspacePlan</span></span><span class="plan-line" style="--i:5"><span class="pl-mute">├─</span> layout    overview_with_detail</span><span class="plan-line" style="--i:6"><span class="pl-mute">└─</span> sections  (5)</span><span class="plan-line" style="--i:7"><span class="pl-mute">   ├─</span> <span class="pl-accent">summary</span>          role=summary     pattern=prose_summary</span><span class="plan-line" style="--i:8"><span class="pl-mute">   │  └─</span> source   tool_call summarize_findings</span><span class="plan-line" style="--i:9"><span class="pl-mute">   │      </span>resolver=CRMResolver  dataset=deals       <span class="pl-bound">bound ✓</span></span><span class="plan-line" style="--i:10"><span class="pl-mute">   ├─</span> <span class="pl-accent">stage_mix</span>        role=primary     pattern=bar_chart</span><span class="plan-line" style="--i:11"><span class="pl-mute">   │  └─</span> source   tool_call segment_population</span><span class="plan-line" style="--i:12"><span class="pl-mute">   │      </span>dataset=deals  dim=stage  measure=count   <span class="pl-bound">bound ✓</span></span><span class="plan-line" style="--i:13"><span class="pl-mute">   ├─</span> <span class="pl-accent">quarter_trend</span>    role=primary     pattern=trend_panel</span><span class="plan-line" style="--i:14"><span class="pl-mute">   │  └─</span> source   tool_call compare_over_time           <span class="pl-bound">bound ✓</span></span><span class="plan-line" style="--i:15"><span class="pl-mute">   ├─</span> <span class="pl-accent">top_deals</span>        role=focus_list  pattern=entity_list</span><span class="plan-line" style="--i:16"><span class="pl-mute">   │  └─</span> source   tool_call rank_entities by=value     <span class="pl-bound">bound ✓</span></span><span class="plan-line" style="--i:17"><span class="pl-mute">   └─</span> <span class="pl-accent">owner_scorecard</span>  role=supporting  pattern=data_table</span><span class="plan-line" style="--i:18"><span class="pl-mute">      └─</span> source   tool_call rank_entities group_by=owner  <span class="pl-bound">bound ✓</span></span></pre>
+      </div>
+      <div class="plan-foot">
+        <span><span class="pf-val accent">planning</span> 1.24s &nbsp;·&nbsp; <span class="pf-val accent">resolve</span> 0.40s &nbsp;·&nbsp; <span class="pf-val accent">total</span> 1.46s</span>
+        <span><span class="pf-val">bound</span> 5/5 &nbsp;·&nbsp; <span class="pf-val">retries</span> 0 &nbsp;·&nbsp; <span class="pf-val">snapshot</span> ✓</span>
+      </div>
+    </div>
+
+    <div class="axiom">
+      <div class="axiom-tag">Premise 03</div>
+      <div class="axiom-body"><em>EXPLAIN.</em> <em>ANALYZE.</em><br />— but for the surface, not the table.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 — MPC POSTER ============ -->
+<section class="slide" data-eyebrow="the proposal">
+  <div class="slide-inner">
+    <div class="tag">06 · the proposal</div>
+    <h2 class="h-slide">We propose three pieces. We call them <em>MPC</em>.</h2>
+    <p class="dek" style="margin-top: 0.8rem;">
+      One piece declares what's possible. One piece is the model's plan for this question. One piece compiles the plan into a page.
+    </p>
+
+    <div class="mpc-poster">
+      <div class="card">
+        <div class="glyph">M</div>
+        <div class="word">Manifest</div>
+        <div class="role">— what the app can do</div>
+        <p class="one-line" style="margin-top: 1rem;">Datasets, dimensions, measures, patterns, primitives.</p>
+      </div>
+      <div class="card">
+        <div class="glyph">P</div>
+        <div class="word">Plan</div>
+        <div class="role">— what should appear</div>
+        <p class="one-line" style="margin-top: 1rem;">A typed, validated value the model emits.</p>
+      </div>
+      <div class="card">
+        <div class="glyph">C</div>
+        <div class="word">Compile</div>
+        <div class="role">— how it becomes a surface</div>
+        <p class="one-line" style="margin-top: 1rem;">Plan in, Renderables out. Deterministic.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 07 — MANIFEST DETAIL ============ -->
+<section class="slide" data-eyebrow="manifest">
+  <div class="slide-inner">
+    <div class="tag">07 · manifest</div>
+    <div class="detail">
+      <div class="lhs">
+        <div class="big-glyph">M</div>
+        <div class="big-glyph-word">Manifest</div>
+        <div class="role">— the catalog, for agents</div>
+      </div>
+      <div class="rhs">
+        <p class="lede">
+          The model is an <em>interpreter</em>. It maps between two grammars — the one the developer has declared possible, and the one the user is trying to express. The Manifest is the developer's side.
+        </p>
+        <p class="body">
+          The thing that makes an AI feature work isn't the model — it's the <em>judgment</em> behind it. Which datasets are worth opening. Which dimensions carry meaning. Which patterns earn the right to render. The model doesn't decide that. You do — once, in the Manifest.
+        </p>
+        <p class="body">
+          It names — in the language the model already speaks — the <strong>datasets</strong> you trust, the <strong>dimensions and measures</strong> that matter, the <strong>filters</strong> you understand, and the <strong>semantic primitives</strong> the model is allowed to use over them: rank, compare, distribute, segment, summarize. Eventually, act.
+        </p>
+        <p class="body">
+          A declaration, not a prompt. <span class="yk">Database-independent.</span> <span class="yk">Model-independent.</span> <span class="yk">Renderer-independent</span> — though here it compiles to Phoenix. Swap the database. Swap the model. Swap the runtime. The Manifest still describes what your application <em>is</em>.
+        </p>
+        <p class="body">
+          Plans bind against it. A plan that names a dataset the app never declared fails at validation, before anything renders. The trust boundary is the type system. The control plane is English.
+        </p>
+
+        <div class="ex">
+          <div class="ex-head"><span class="y">manifest.ex</span> &nbsp;·&nbsp; CRMResolver.describe/0</div>
+          <div class="ex-body"><span class="c-mute">%</span><span class="c-key">{</span>
+  datasets<span class="c-mute">:</span> [
+    <span class="c-y">"deals"</span> <span class="c-mute">=&gt;</span> %{
+      dimensions<span class="c-mute">:</span> [<span class="c-y">:stage</span>, <span class="c-y">:owner</span>, <span class="c-y">:closed_at</span>, <span class="c-y">:region</span>],
+      measures<span class="c-mute">:</span>   [<span class="c-y">:count</span>, <span class="c-y">:sum_value</span>, <span class="c-y">:avg_value</span>],
+      filters<span class="c-mute">:</span>    [<span class="c-y">:closed_at</span>, <span class="c-y">:owner</span>, <span class="c-y">:stage</span>]
+    }
+  ],
+  primitives<span class="c-mute">:</span> [<span class="c-y">:rank_entities</span>, <span class="c-y">:segment_population</span>,
+                <span class="c-y">:compare_over_time</span>, <span class="c-y">:summarize_findings</span>],
+  patterns<span class="c-mute">:</span>   [<span class="c-y">:bar_chart</span>, <span class="c-y">:trend_panel</span>, <span class="c-y">:entity_list</span>,
+                <span class="c-y">:data_table</span>, <span class="c-y">:prose_summary</span>]
+<span class="c-key">}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 08 — PLAN DETAIL ============ -->
+<section class="slide" data-eyebrow="plan">
+  <div class="slide-inner">
+    <div class="tag">08 · plan</div>
+    <div class="detail">
+      <div class="lhs">
+        <div class="big-glyph">P</div>
+        <div class="big-glyph-word">Plan</div>
+        <div class="role">— the artifact</div>
+      </div>
+      <div class="rhs">
+        <p class="lede">
+          The <em>Plan</em> is a typed, validated value the model emits. A workspace is a goal, a layout, and a list of <strong>sections</strong>. Each section names a <strong>role</strong>, a presentation <strong>pattern</strong>, and a <strong>source</strong> — a typed tool call that returns a Result.
+        </p>
+        <p class="body">
+          The plan is a <span class="yk">value</span>. The rendered page is one expression of it. The saved JSON snapshot is another. The same plan replayed against tomorrow's data, with no new model call, is a third.
+        </p>
+
+        <div class="ex">
+          <div class="ex-head"><span class="y">workspace_plan.ex</span> &nbsp;·&nbsp; emitted by the optimizer</div>
+          <div class="ex-body"><span class="c-mute">%</span><span class="c-key">WorkspacePlan</span>{
+  goal<span class="c-mute">:</span>     <span class="c-y">:pipeline_review</span>,
+  layout<span class="c-mute">:</span>   <span class="c-y">:overview_with_detail</span>,
+  identity<span class="c-mute">:</span> <span class="c-y">"crm:pipeline-review"</span>,
+  sections<span class="c-mute">:</span> [
+    <span class="c-mute">%</span><span class="c-key">Section</span>{
+      id<span class="c-mute">:</span>      <span class="c-y">"summary"</span>,
+      role<span class="c-mute">:</span>    <span class="c-y">:summary</span>,
+      pattern<span class="c-mute">:</span> <span class="c-y">:prose_summary</span>,
+      source<span class="c-mute">:</span>  {<span class="c-y">:tool_call</span>, %<span class="c-key">ToolCall</span>{...}}
+    },
+    <span class="c-mute">% … 4 more sections …</span>
+  ]
+}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 09 — COMPILE DETAIL ============ -->
+<section class="slide" data-eyebrow="compile">
+  <div class="slide-inner">
+    <div class="tag">09 · compile</div>
+    <div class="detail">
+      <div class="lhs">
+        <div class="big-glyph">C</div>
+        <div class="big-glyph-word">Compile</div>
+        <div class="role">— plan to surface</div>
+      </div>
+      <div class="rhs">
+        <p class="lede">
+          The <em>Compiler</em> takes a Plan in and produces Renderables out. It walks each section, resolves the source through your Resolver, hands the Result to a Presenter, stamps a stable identity, and produces a list of components Phoenix will mount.
+        </p>
+        <p class="body">
+          The compiler is <strong>total over valid plans</strong>. It can only fail on invalid plans — and validation catches those before compilation begins. Per-section failures become explicit error Renderables. Other sections render anyway.
+        </p>
+        <p class="body">
+          Resonance composes <span class="yk">what should appear</span>. Phoenix runs <span class="yk">what appears</span>.
+        </p>
+
+        <div class="ex">
+          <div class="ex-head"><span class="y">compile/2</span> &nbsp;·&nbsp; plan in, renderables out</div>
+          <div class="ex-body"><span class="c-key">WorkspaceCompiler</span>.compile(plan, ctx)
+<span class="c-mute">#=&gt; </span><span class="c-key">{:ok</span>, <span class="c-mute">%{</span>
+       plan<span class="c-mute">:</span>        plan,
+       sections<span class="c-mute">:</span>    [...],
+       renderables<span class="c-mute">:</span> [
+         <span class="c-mute">%</span><span class="c-key">Renderable</span>{
+           id<span class="c-mute">:</span>        <span class="c-y">"crm:pipeline-review:summary:prose"</span>,
+           component<span class="c-mute">:</span> <span class="c-key">ProseSection</span>,
+           props<span class="c-mute">:</span>     %{...},
+           status<span class="c-mute">:</span>    <span class="c-y">:ready</span>
+         },
+         <span class="c-mute">% … 4 more renderables …</span>
+       ]
+     <span class="c-mute">}}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10 — CANON ============ -->
+<section class="slide" data-eyebrow="names that stuck">
+  <div class="slide-inner">
+    <div class="tag">10 · names that stuck</div>
+    <h2 class="h-slide">A few letters can hold a lot.</h2>
+    <p class="dek" style="margin-top: 0.8rem;">
+      Two patterns you already use. Each compressed an architecture into something you could draw on a napkin. We propose a third — for the layer between an agent and an application.
+    </p>
+
+    <div class="canon-list">
+      <div class="canon-row">
+        <div class="when">REST · the 2000s</div>
+        <div class="what">Named the verbs between client and server. A decade of API design fell in behind it.</div>
+        <div class="acronym">CRUD</div>
+      </div>
+      <div class="canon-row">
+        <div class="when">Rails · the 2010s</div>
+        <div class="what">Named where state, behavior, and view belong on the page. Anyone could draw the picture.</div>
+        <div class="acronym">MVC</div>
+      </div>
+      <div class="canon-row" style="border-bottom: 0;">
+        <div class="when">Resonance · now</div>
+        <div class="what"><em>Manifest, Plan, Compile.</em> The artifact is a workspace. The runtime is Phoenix LiveView.</div>
+        <div class="acronym">MPC</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 11 — CLOSING ============ -->
+<section class="slide" data-eyebrow="in closing">
+  <div class="slide-inner">
+    <div class="tag">11 · in closing</div>
+
+    <div class="closing-build stagger">
+      <div class="line">Soon, we <em>won't</em> build pages.</div>
+      <div class="line">We declare a <em>grammar</em> of what's possible.</div>
+      <div class="line">The right page is <em>discovered</em>, not designed.</div>
+    </div>
+
+    <div class="closing-final reveal">
+      The model writes the <em>plan</em>.
+    </div>
+
+    <div class="closing-links reveal">
+      <a href="https://github.com/mhyrr/resonance">github</a>
+      <a href="../../README.md">readme</a>
+      <a href="../design/v3-execution-plan.md">execution plan</a>
+      <a href="../design/v3-thesis-results.md">thesis results</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  (function () {
+    const deck   = document.getElementById('deck');
+    const slides = Array.from(deck.querySelectorAll('.slide'));
+    const cur    = document.getElementById('cur');
+    const tot    = document.getElementById('tot');
+    const eyeb   = document.getElementById('eyebrow');
+    const rail   = document.getElementById('rail');
+
+    tot.textContent = String(slides.length).padStart(2, '0');
+
+    // build rail dots
+    slides.forEach((s, i) => {
+      const d = document.createElement('span');
+      d.className = 'dot';
+      d.setAttribute('data-i', String(i));
+      d.addEventListener('click', () => s.scrollIntoView({ behavior: 'smooth' }));
+      rail.appendChild(d);
+    });
+    const dots = Array.from(rail.querySelectorAll('.dot'));
+
+    // observe slides for current
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting && e.intersectionRatio > 0.5) {
+          const i = slides.indexOf(e.target);
+          cur.textContent = String(i + 1).padStart(2, '0');
+          const eye = e.target.getAttribute('data-eyebrow') || '';
+          eyeb.innerHTML = '<span class="lab">·</span> &nbsp;' + eye;
+          dots.forEach((d, j) => d.classList.toggle('active', j === i));
+          // also trigger reveal
+          e.target.classList.add('visible');
+        }
+      });
+    }, { root: deck, threshold: [0.4, 0.5, 0.6] });
+    slides.forEach((s) => io.observe(s));
+
+    // keyboard navigation
+    function indexAt() {
+      const sh = window.innerHeight;
+      return Math.round(deck.scrollTop / sh);
+    }
+    function go(d) {
+      const i = Math.max(0, Math.min(slides.length - 1, indexAt() + d));
+      slides[i].scrollIntoView({ behavior: 'smooth' });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      switch (e.key) {
+        case 'ArrowDown':
+        case 'PageDown':
+        case ' ':
+        case 'j':
+          e.preventDefault(); go(1); break;
+        case 'ArrowUp':
+        case 'PageUp':
+        case 'k':
+          e.preventDefault(); go(-1); break;
+        case 'Home':
+          e.preventDefault(); slides[0].scrollIntoView({ behavior: 'smooth' }); break;
+        case 'End':
+          e.preventDefault(); slides[slides.length - 1].scrollIntoView({ behavior: 'smooth' }); break;
+      }
+    });
+
+    // pre-mark hero visible (so animations fire on load)
+    slides[0].classList.add('visible');
+  })();
+</script>
+
+</body>
+</html>
