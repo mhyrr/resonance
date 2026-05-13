@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Resonance — Declare the grammar. Discover the page.</title>
-<meta name="description" content="An application has a grammar of what it can do. A user has an intent they can't fully articulate. Resonance is the typed surface where the model maps between them — and the right page is discovered, not designed." />
+<title>Resonance — The LLM doesn't write your UI. It plans it.</title>
+<meta name="description" content="A pattern for AI-native software. The database solved this shape of problem fifty years ago. We just transplanted the answer onto the screen." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -913,7 +913,7 @@
 
     <div class="body" style="margin-top: 1.6rem;">
       <p class="lede">
-        The demo is always the same. The model emits markup. The browser renders it. The user sees it. Then ask one quiet question.
+        Look at every viral AI-generated interface of the last two years. The model emits markup. The runtime renders it. The user sees it. Then ask one quiet question.
       </p>
       <p style="font-family: var(--serif-display); font-variation-settings: 'opsz' 96, 'SOFT' 90, 'WONK' 1; font-style: italic; font-size: clamp(1.4rem, 2.6vw, 1.95rem); color: var(--orange); margin: 1.2rem 0 1.4rem;">
         Where is the plan?
@@ -924,7 +924,7 @@
     </div>
 
     <div class="axiom">
-      <div class="axiom-tag">Premise 01</div>
+      <div class="axiom-tag">Axiom 01</div>
       <div class="axiom-body">Generative UI is a parlor trick.<br /><em>Selective</em> UI is a product.</div>
     </div>
 
@@ -1074,8 +1074,8 @@
     </div>
 
     <div class="axiom">
-      <div class="axiom-tag">Premise 02</div>
-      <div class="axiom-body">One step is opaque.<br />The rest is <em>glass</em>.</div>
+      <div class="axiom-tag">Axiom 02</div>
+      <div class="axiom-body">Intelligence upstream.<br /><em>Determinism</em> downstream.</div>
     </div>
   </div>
 </section>
@@ -1104,7 +1104,7 @@
     </div>
 
     <div class="axiom">
-      <div class="axiom-tag">Premise 03</div>
+      <div class="axiom-tag">Axiom 03</div>
       <div class="axiom-body"><em>EXPLAIN.</em> <em>ANALYZE.</em><br />— but for the surface, not the table.</div>
     </div>
   </div>
@@ -1116,7 +1116,7 @@
     <div class="tag">06 · the proposal</div>
     <h2 class="h-slide">We propose three pieces. We call them <em>MPC</em>.</h2>
     <p class="dek" style="margin-top: 0.8rem;">
-      One piece declares what's possible. One piece is the model's plan for this question. One piece compiles the plan into a page.
+      One piece the application declares, one the model emits, one the runtime runs.
     </p>
 
     <div class="mpc-poster">
@@ -1154,19 +1154,13 @@
       </div>
       <div class="rhs">
         <p class="lede">
-          The model is an <em>interpreter</em>. It maps between two grammars — the one the developer has declared possible, and the one the user is trying to express. The Manifest is the developer's side.
+          The <em>Manifest</em> is what your application has declared it can do. It's the agent-readable interface to a real product — the database's <code>information_schema</code>, lifted to product capabilities.
         </p>
         <p class="body">
-          The thing that makes an AI feature work isn't the model — it's the <em>judgment</em> behind it. Which datasets are worth opening. Which dimensions carry meaning. Which patterns earn the right to render. The model doesn't decide that. You do — once, in the Manifest.
+          A Resonance app names its <strong>datasets</strong> (deals, customers, orders), the <strong>dimensions and measures</strong> each accepts, the <strong>filters</strong> they understand, and the <strong>semantic primitives</strong> the model is allowed to use over them — rank, compare, distribute, segment, summarize. Eventually, actions.
         </p>
         <p class="body">
-          It names — in the language the model already speaks — the <strong>datasets</strong> you trust, the <strong>dimensions and measures</strong> that matter, the <strong>filters</strong> you understand, and the <strong>semantic primitives</strong> the model is allowed to use over them: rank, compare, distribute, segment, summarize. Eventually, act.
-        </p>
-        <p class="body">
-          A declaration, not a prompt. <span class="yk">Database-independent.</span> <span class="yk">Model-independent.</span> <span class="yk">Renderer-independent</span> — though here it compiles to Phoenix. Swap the database. Swap the model. Swap the runtime. The Manifest still describes what your application <em>is</em>.
-        </p>
-        <p class="body">
-          Plans bind against it. A plan that names a dataset the app never declared fails at validation, before anything renders. The trust boundary is the type system. The control plane is English.
+          Plans bind against this manifest. A plan that names a dataset the app never declared fails at validation, before anything renders. The trust boundary is the type system.
         </p>
 
         <div class="ex">
@@ -1309,12 +1303,12 @@
 
     <div class="closing-build stagger">
       <div class="line">Soon, we <em>won't</em> build pages.</div>
-      <div class="line">We declare a <em>grammar</em> of what's possible.</div>
-      <div class="line">The right page is <em>discovered</em>, not designed.</div>
+      <div class="line">We define values and UI patterns.</div>
+      <div class="line">The user says what they want.</div>
     </div>
 
     <div class="closing-final reveal">
-      The model writes the <em>plan</em>.
+      The model ships the <em>plan</em>.
     </div>
 
     <div class="closing-links reveal">

@@ -107,9 +107,20 @@ defmodule Resonance.PlannerTest do
 
       assert_receive {:planner_provider_called, ^prompt, [schema], system_prompt}
       assert schema.name == "create_workspace_plan"
+
+      arguments_schema =
+        schema.parameters.properties.sections.items.properties.source.properties.tool_call.properties.arguments
+
+      assert arguments_schema.properties.filters.type == "array"
+      assert arguments_schema.properties.filters.items.required == ["field", "op", "value"]
+      assert arguments_schema.properties.sort.properties.field.type == "string"
       assert system_prompt =~ "workspace planner"
       assert system_prompt =~ ~s("deals")
       assert system_prompt =~ "sum(value)"
+      assert system_prompt =~ "filters must be an array"
+      assert system_prompt =~ "must match"
+      assert system_prompt =~ "one declared query_shape exactly"
+      assert system_prompt =~ "Multi-dimension sections are allowed only"
     end
 
     test "passes app-declared patterns through schema, prompt, and JSON decoding" do
@@ -300,6 +311,8 @@ defmodule Resonance.PlannerTest do
       assert result.attempts == 2
       assert result.retried?
       assert result.recovered?
+      assert Enum.any?(result.retry_errors, &match?(%{code: :unsupported_measure}, &1))
+      assert Enum.any?(result.retry_errors, &match?(%{code: :unsupported_dimension}, &1))
       assert Enum.map(result.plan.sections, & &1.id) == ["summary", "stage_mix", "owner_focus"]
 
       assert_receive {:planner_provider_called, ^prompt, [_schema], _system_prompt}
@@ -308,7 +321,37 @@ defmodule Resonance.PlannerTest do
       assert retry_prompt =~ "previous workspace plan was invalid"
       assert retry_prompt =~ "unsupported_measure"
       assert retry_prompt =~ "unsupported_dimension"
+      assert retry_prompt =~ ~s([{"field": "stage", "op": "=", "value": "negotiation"}])
+      assert retry_prompt =~ "one exact declared query_shape"
+
+      assert retry_prompt =~ "combine dimensions unless that exact dimension list is declared"
+
       assert retry_prompt =~ prompt
+    end
+
+    test "keeps retry-triggering validation errors when the retry also fails" do
+      prompt = "Show deal probability."
+
+      invalid_plan =
+        valid_plan_map(%{
+          "sections" => [
+            section_map("bad_probability", "rank_entities", %{
+              "dataset" => "deals",
+              "measures" => ["sum(probability)"],
+              "dimensions" => ["probability"],
+              "title" => "Deal probability"
+            })
+          ]
+        })
+
+      Process.put(:planner_outputs, [invalid_plan, invalid_plan])
+
+      assert {:error, result} = Planner.plan_result(prompt, %{resolver: CRMResolver})
+      assert result.attempts == 2
+      assert result.retried?
+      refute result.recovered?
+      assert {:validation_failed, _errors} = result.reason
+      assert Enum.any?(result.retry_errors, &match?(%{code: :unsupported_measure}, &1))
     end
   end
 

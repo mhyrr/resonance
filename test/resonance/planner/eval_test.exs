@@ -211,6 +211,9 @@ defmodule Resonance.Planner.EvalTest do
     assert result.attempts == 2
     assert result.retried?
     assert result.recovered?
+    assert result.diagnostics.retry_error_count > 0
+    assert :unsupported_measure in result.diagnostics.retry_validation_error_codes
+    assert Enum.any?(result.retry_errors, &match?(%{code: :unsupported_dimension}, &1))
   end
 
   test "compiles plans that use app-declared patterns" do

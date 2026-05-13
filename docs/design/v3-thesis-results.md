@@ -4,6 +4,36 @@
 > vision doc. It records what the current implementation proves, what it does
 > not prove, and why the remaining v3 work is still worth doing.
 
+Related follow-up: `docs/design/v3-developer-grammar.md` sketches the developer
+methodology implied by these results: expose existing web primitives as a
+planner-legible product grammar.
+
+## 2026-05-13 real-provider planner update
+
+The real-provider CRM planner eval now passes the v3 thesis test for the
+bounded read-only CRM corpus:
+
+```text
+12 CRM prompts
+  -> Anthropic planner emits create_workspace_plan
+  -> JSON-safe WorkspacePlan decoding
+  -> validation against CRM capabilities and pattern manifest
+  -> WorkspaceCompiler
+  -> existing Renderables/Widgets
+```
+
+Result: 12/12 valid plans and 12/12 compiled workspaces. One prompt required a
+validation-feedback retry and recovered. The corpus includes ten ordinary CRM
+asks, one off-the-wall forecast-risk prompt, and one longer board-packet prompt
+that emits a larger executive dashboard. The generated artifact is
+`docs/design/v3-planner-eval-real-results.md`.
+
+This is the missing half the first demo did not prove. It does not mean the
+planner is production-complete for arbitrary apps or action surfaces. It does
+prove that, given a structured CRM capability contract, a production LLM can
+emit typed workspace plans that validate and compile without prompt-specific
+page code.
+
 ## 2026-05-11 planner/pattern update
 
 The implementation now proves the planner contract with mocked providers:
@@ -23,11 +53,10 @@ packet ask that compiles into a larger dashboard. Invalid outputs return
 structured validation errors, and one validation-feedback retry is measured by
 the harness.
 
-This still does **not** prove that a production LLM will reliably choose the
-right plan on live prompts. It proves the contract the model must satisfy:
-available datasets, measures, dimensions, filters, query shapes, roles,
-patterns, and primitive sources are declared structurally, and impossible plans
-fail before rendering.
+The mocked-provider eval still matters because it proves the contract
+deterministically. The real-provider eval proves the contract is usable by a
+production model on the CRM corpus. Both are needed: one gives regression
+stability, the other gives product plausibility.
 
 The pattern layer is deliberately small. `Resonance.Patterns` is a manifest of
 planner-facing names and compatibility rules, not a Phoenix component behavior.
@@ -65,9 +94,10 @@ probability-field plan is rejected with actionable validation errors.
 A first real-provider attempt found the expected kind of failure: the model used
 invented measure names and a non-declared filter shape. That hardened the
 boundary. Non-list filters now fail as query-intent validation errors instead of
-crashing, and `WorkspaceCompiler.compile/2` validates tool calls against
-structured resolver capabilities before resolving sections. The eval also no
-longer counts section-local error renderables as compiled success.
+crashing, resolver modules are explicitly loaded before reading structured
+capabilities, and `WorkspaceCompiler.compile/2` validates tool calls against
+those capabilities before resolving sections. The eval also no longer counts
+section-local error renderables as compiled success.
 
 ## The claim under test
 
@@ -76,12 +106,14 @@ The v3 vision made a strong claim:
 > Resonance lets a user's intent project a workspace from the application's
 > capabilities.
 
-The current CRM demo does **not** fully prove that sentence.
+The first hand-written CRM demo did **not** fully prove that sentence. The
+real-provider planner eval now proves the bounded read-only CRM version of it.
 
-It proves the deterministic middle of the sentence: a typed workspace can be
-projected from declared product capabilities into a real Phoenix surface, bound
-to live application data, with stable identity, interactivity, and rerun
-behavior.
+The implementation first proved the deterministic middle of the sentence: a
+typed workspace can be projected from declared product capabilities into a real
+Phoenix surface, bound to live application data, with stable identity,
+interactivity, and rerun behavior. The planner eval adds the missing front half:
+representative CRM user intent can become a valid typed workspace plan.
 
 That is the right thing to have proven first.
 
@@ -91,7 +123,7 @@ demo proves that the non-LLM part of v3 has a coherent shape.
 
 ## What exists now
 
-The CRM demo now has a hand-written workspace plan:
+The original CRM demo has a hand-written workspace plan:
 
 - `ResonanceDemo.Workspaces.pipeline_review/0`
 - goal: `:pipeline_review`
@@ -153,8 +185,9 @@ then compiles each section through the existing composer/presenter path and
 stamps stable renderable IDs from workspace identity, section ID, and renderable
 type.
 
-That gives the planner a firm target later. The planner will not be asked to
-invent UI. It will be asked to emit a valid plan inside a constrained grammar.
+That gives the planner a firm target. The real-provider eval matters because
+the planner was not asked to invent UI; it was asked to emit a valid plan inside
+a constrained grammar.
 
 ### 3. v1 and v2 were not thrown away
 
@@ -227,36 +260,42 @@ The interesting part is not "the model generated UI." The interesting part is:
 
 ## What the demo does not prove
 
-### 1. It does not yet prove user intent -> workspace plan
+### 1. It does not prove arbitrary user intent -> arbitrary workspace plan
 
-The CRM workspace is hand-written. The user prompt is present as the original
-intent string, but no planner currently turns that string into the plan.
-
-So the current demo proves:
+The first CRM workspace was hand-written. The planner eval now proves a bounded
+stronger path:
 
 ```text
-valid WorkspacePlan -> working workspace
+CRM user intent -> valid WorkspacePlan -> working workspace
 ```
 
-It does not yet prove:
+That is not the same as proving every possible product intent, every app
+domain, or every future workspace behavior. The claim is now narrower and
+stronger: within declared app capabilities, the planner can emit valid typed
+plans for a representative CRM read-workspace corpus.
+
+The next breadth test is not "can one hand-authored page render?" It is:
 
 ```text
-open-ended user intent -> valid WorkspacePlan -> working workspace
+new app capability manifest
+  -> unfamiliar domain prompts
+  -> valid WorkspacePlan
+  -> working workspace
 ```
 
-That is the next real test.
+### 2. It does not yet prove the final zero-prebuilt-page product surface
 
-### 2. It does not yet prove zero pre-built pages
+There is still a `/workspace` route, and `/planner-eval` runs a fixed prompt
+corpus. Those routes are demo and evaluation harnesses, not the final interface
+model.
 
-There is still a `/workspace` route. That route is a demo harness, not the final
-interface model.
+The planner eval proves that different prompts can materialize different valid
+plans without each workspace being hand-authored. It does not yet prove the
+open product experience around discovery, persistence, sharing, navigation, and
+repeat use.
 
-The stronger claim becomes true only when a user can ask for different
-workspaces and the system materializes different valid plans without each
-workspace having been hand-authored in advance.
-
-The current result makes that plausible because the rendered surface is derived
-from the plan. It does not prove planner breadth.
+The current result makes that product shape plausible because the rendered
+surface is derived from the plan. It does not prove the whole workspace product.
 
 ### 3. It does not yet prove action surfaces
 
@@ -273,14 +312,16 @@ Action surfaces still need their own safety proof:
 
 That should remain deferred until read/refine workspaces are credible.
 
-### 4. It does not yet prove capability manifests
+### 4. It does not yet prove complete capability manifests
 
-The plan uses tool calls directly as section sources. That is acceptable for
-the v2.5 layer, but the planner eventually needs a richer capability manifest:
-data capabilities, interaction capabilities, patterns, and action capabilities.
+The planner now has structured data capabilities and a pattern manifest:
+datasets, measures, dimensions, filters, query shapes, roles, patterns, and
+primitive compatibility are declared instead of inferred from prose.
 
-Without that, planner mode risks becoming "LLM picks primitive names" instead
-of "intent projects a workspace from product capabilities."
+That is enough for read-only CRM workspaces. It is not the complete capability
+surface. Interaction capabilities, persistence affordances, and action
+capabilities still need their own contracts before Resonance can claim the full
+v3 product surface.
 
 ### 5. It does not yet prove cross-section intelligence
 
@@ -325,20 +366,23 @@ The current v3 path is different. It can represent the surface itself as data:
 which sections exist, what roles they play, what sources feed them, which
 patterns they use, and how their identities survive refresh.
 
-The CRM demo still uses one hand-written plan, so it is not yet a full adaptive
-workspace system. But it proves that a workspace can be compiled from a plan
-rather than hand-coded as a page.
+The original CRM demo still uses one hand-written plan, and the planner eval
+uses a bounded CRM prompt corpus. So this is not yet a full adaptive workspace
+system. But it proves that workspaces can be compiled from plans rather than
+hand-coded as pages, and that a production LLM can emit those plans inside the
+declared CRM contract.
 
 That is the crack in the wall.
 
-Once planner mode emits valid plans, the same compiler can produce different
-workspaces from different user intents. At that point Resonance is no longer
-choosing between dashboards. It is projecting a workspace from the application's
-capability field.
+Now that planner mode emits valid plans for the CRM corpus, the same compiler
+can produce different workspaces from different user intents. Resonance is no
+longer merely choosing between dashboards in this bounded case. It is projecting
+a workspace from the application's capability field.
 
 ## Practical conclusion
 
-The v3 implementation has proven the load-bearing middle layer:
+The v3 implementation has now proven both the load-bearing middle layer and the
+bounded planner contract:
 
 - `WorkspacePlan` is the right primary IR.
 - The compiler can target existing Renderables and Widgets.
@@ -347,10 +391,11 @@ The v3 implementation has proven the load-bearing middle layer:
 - Phoenix can remain the runtime.
 - Resonance can avoid owning app data, app persistence, and mutations.
 - v1/v2 APIs can survive underneath v3.
+- CRM user intent can become valid typed plans under a structured capability
+  contract.
+- Real-provider validation retry can recover at least one invalid first pass.
 
-The thesis is not fully validated yet.
-
-The next decisive proof is planner mode:
+The thesis is not fully complete, but it has crossed the important threshold:
 
 ```text
 user intent
@@ -359,7 +404,6 @@ user intent
   -> working workspace
 ```
 
-The success bar should be unforgiving. If planner mode cannot reliably emit
-valid, useful plans against a capability manifest, then v3 collapses back into
-dashboard routing. If it can, Resonance becomes something more interesting: a
-runtime for user-shaped product surfaces.
+The remaining work is product breadth and safety, not the core read-workspace
+thesis. The next decisive tests should be live exploration quality, persistence
+semantics, cross-domain capability manifests, and only later action surfaces.

@@ -110,11 +110,17 @@ defmodule Resonance.Resolver.Capabilities do
   @spec from_resolver(module() | nil) ::
           {:ok, t()} | {:error, {:validation_failed, [validation_error()]}}
   def from_resolver(resolver) when is_atom(resolver) and not is_nil(resolver) do
-    if function_exported?(resolver, :describe, 0) do
-      resolver.describe()
-      |> normalize()
-    else
-      {:ok, empty()}
+    case Code.ensure_loaded(resolver) do
+      {:module, module} ->
+        if function_exported?(module, :describe, 0) do
+          module.describe()
+          |> normalize()
+        else
+          {:ok, empty()}
+        end
+
+      {:error, _reason} ->
+        {:ok, empty()}
     end
   end
 

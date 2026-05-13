@@ -244,14 +244,22 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   # --- Contacts ---
 
+  defp query_for(%{dataset: "contacts", dimensions: ["name"]} = intent) do
+    q =
+      Contact
+      |> apply_contact_filters(intent.filters)
+      |> select_count_by_dimension(:name, intent)
+
+    {:ok, q}
+  end
+
   defp query_for(%{dataset: "contacts", dimensions: ["stage"]} = intent) do
     q =
       Contact
       |> apply_contact_filters(intent.filters)
-      |> group_by([c], c.stage)
-      |> select([c], %{label: c.stage, value: count(c.id)})
+      |> select_count_by_dimension(:stage, intent)
 
-    {:ok, apply_query_modifiers(q, intent)}
+    {:ok, q}
   end
 
   defp query_for(%{dataset: "contacts"} = intent) do
@@ -269,20 +277,18 @@ defmodule ResonanceDemo.CRM.Resolver do
     q =
       Activity
       |> apply_activity_filters(intent.filters)
-      |> group_by([a], a.type)
-      |> select([a], %{label: a.type, value: count(a.id)})
+      |> select_count_by_dimension(:type, intent)
 
-    {:ok, apply_query_modifiers(q, intent)}
+    {:ok, q}
   end
 
   defp query_for(%{dataset: "activities", dimensions: ["outcome"]} = intent) do
     q =
       Activity
       |> apply_activity_filters(intent.filters)
-      |> group_by([a], a.outcome)
-      |> select([a], %{label: a.outcome, value: count(a.id)})
+      |> select_count_by_dimension(:outcome, intent)
 
-    {:ok, apply_query_modifiers(q, intent)}
+    {:ok, q}
   end
 
   defp query_for(%{dataset: "activities"} = intent) do
@@ -362,6 +368,14 @@ defmodule ResonanceDemo.CRM.Resolver do
       _ ->
         select(query, [c], %{label: field(c, ^label_field), value: count(c.id)})
     end
+  end
+
+  defp select_count_by_dimension(query, label_field, intent) do
+    query
+    |> group_by([record], field(record, ^label_field))
+    |> apply_count_sort(intent.sort)
+    |> select([record], %{label: field(record, ^label_field), value: count(record.id)})
+    |> apply_limit(intent.limit)
   end
 
   # --- Filter helpers ---
@@ -456,6 +470,16 @@ defmodule ResonanceDemo.CRM.Resolver do
   defp apply_sort(query, %{direction: :desc}), do: order_by(query, [s], desc: :value)
   defp apply_sort(query, %{direction: :asc}), do: order_by(query, [s], asc: :value)
   defp apply_sort(query, _), do: query
+
+  defp apply_count_sort(query, nil), do: query
+
+  defp apply_count_sort(query, %{direction: :asc}),
+    do: order_by(query, [record], asc: count(record.id))
+
+  defp apply_count_sort(query, %{direction: :desc}),
+    do: order_by(query, [record], desc: count(record.id))
+
+  defp apply_count_sort(query, _sort), do: query
 
   # For ungrouped queries where we need to sort by the actual column
   defp apply_sort_by_field(query, nil, _field), do: query

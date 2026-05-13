@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Resonance — The LLM doesn't write your UI. It plans it.</title>
-<meta name="description" content="A pattern for AI-native software. The database solved this shape of problem fifty years ago. We just transplanted the answer onto the screen." />
+<title>Resonance — Declare the grammar. Compile the surface.</title>
+<meta name="description" content="An application has a grammar of what it can do. A user has an intent they can't fully articulate. Resonance is the typed surface where the model maps between them — then deterministic code compiles the right surface at runtime." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -737,7 +737,8 @@
   /* ============ closing ============ */
   .closing-build {
     display: grid; gap: 1.2rem;
-    max-width: 60ch;
+    width: 100%;
+    max-width: none;
   }
   .closing-build .line {
     font-family: var(--serif-display);
@@ -747,7 +748,7 @@
     font-size: clamp(1.4rem, 3vw, 2.1rem);
     line-height: 1.15;
     color: var(--paper-2);
-    text-wrap: balance;
+    white-space: nowrap;
   }
   .closing-build .line em { color: var(--orange); font-style: italic; }
   .closing-final {
@@ -779,6 +780,13 @@
     transition: color 0.2s ease, border-color 0.2s ease;
   }
   .closing-links a:hover { color: var(--orange); border-bottom-color: var(--orange); }
+
+  @media (max-width: 760px) {
+    .closing-build .line {
+      white-space: normal;
+      text-wrap: balance;
+    }
+  }
 
   /* ============ reveal animation ============ */
   .reveal {
@@ -913,7 +921,7 @@
 
     <div class="body" style="margin-top: 1.6rem;">
       <p class="lede">
-        Look at every viral AI-generated interface of the last two years. The model emits markup. The runtime renders it. The user sees it. Then ask one quiet question.
+        The demo is always the same. The model emits markup. The browser renders it. The user sees it. Then ask one quiet question.
       </p>
       <p style="font-family: var(--serif-display); font-variation-settings: 'opsz' 96, 'SOFT' 90, 'WONK' 1; font-style: italic; font-size: clamp(1.4rem, 2.6vw, 1.95rem); color: var(--orange); margin: 1.2rem 0 1.4rem;">
         Where is the plan?
@@ -924,14 +932,14 @@
     </div>
 
     <div class="axiom">
-      <div class="axiom-tag">Axiom 01</div>
-      <div class="axiom-body">Generative UI is a parlor trick.<br /><em>Selective</em> UI is a product.</div>
+      <div class="axiom-tag">Premise 01</div>
+      <div class="axiom-body">Generative UI is a parlor trick.<br /><em>Planned</em> surfaces are a product.</div>
     </div>
 
     <div class="term">
-      <div class="term-lab">Selective UI</div>
+      <div class="term-lab">Planned surfaces</div>
       <div class="term-body">
-        The model doesn't <strong>generate</strong> your interface. It <strong>picks</strong> one from a finite, typed grammar of what your application has declared it can do. A parser into your vocabulary, not an author of new ones.
+        The model doesn't <strong>generate</strong> your interface. It maps intent into a finite, typed grammar of what your application has declared it can do. The output is not markup. It is a plan the app can validate, diff, replay, and compile.
       </div>
     </div>
   </div>
@@ -1005,7 +1013,7 @@
         </div>
         <div class="ph-arrow">↦</div>
         <div class="ph-r">
-          <div class="what"><em>Compiler</em> → Renderables</div>
+          <div class="what"><em>Compile</em> → Renderables</div>
           <div class="det glass">glass</div>
         </div>
       </div>
@@ -1044,7 +1052,7 @@
         In Resonance, the language model plays that role. Same job, different substrate. It selects a plan from a search space using learned representation in place of histograms, and a semantic cost function in place of latency. The mechanism is opaque. The role is identical.
       </p>
       <p>
-        Then the model gets out of the way. The plan is typed. The compiler is total over valid plans. The renderer is Phoenix. Everything downstream of the optimizer is <span class="yk">glass</span>.
+        Then the model gets out of the way. The plan is typed. Compile is deterministic over valid plans. Phoenix runs the rendered surface. Everything downstream of the optimizer is <span class="yk">glass</span>.
       </p>
     </div>
 
@@ -1074,8 +1082,8 @@
     </div>
 
     <div class="axiom">
-      <div class="axiom-tag">Axiom 02</div>
-      <div class="axiom-body">Intelligence upstream.<br /><em>Determinism</em> downstream.</div>
+      <div class="axiom-tag">Premise 02</div>
+      <div class="axiom-body">One step is opaque.<br />The rest is <em>glass</em>.</div>
     </div>
   </div>
 </section>
@@ -1086,7 +1094,7 @@
     <div class="tag">05 · the artifact</div>
     <h2 class="h-slide">An AI-shaped workspace — when you can <em>read</em> it.</h2>
     <p class="dek" style="margin-top: 0.8rem;">
-      The model emitted this plan. The compiler validated it against the application's declared capabilities. Phoenix rendered it. Below: the same artifact, made legible.
+      The model emitted this plan. Resonance validated it against the application's declared capabilities. Phoenix rendered the surface. Below: the same artifact, made legible.
     </p>
 
     <div class="plan-frame">
@@ -1104,8 +1112,8 @@
     </div>
 
     <div class="axiom">
-      <div class="axiom-tag">Axiom 03</div>
-      <div class="axiom-body"><em>EXPLAIN.</em> <em>ANALYZE.</em><br />— but for the surface, not the table.</div>
+      <div class="axiom-tag">Premise 03</div>
+      <div class="axiom-body"><em>EXPLAIN.</em> <em>ANALYZE.</em><br />— for the surface plan.</div>
     </div>
   </div>
 </section>
@@ -1116,7 +1124,7 @@
     <div class="tag">06 · the proposal</div>
     <h2 class="h-slide">We propose three pieces. We call them <em>MPC</em>.</h2>
     <p class="dek" style="margin-top: 0.8rem;">
-      One piece the application declares, one the model emits, one the runtime runs.
+      The Manifest declares what the app can do. The Plan captures what this user needs. Compile turns it into the surface the product should show now.
     </p>
 
     <div class="mpc-poster">
@@ -1129,13 +1137,13 @@
       <div class="card">
         <div class="glyph">P</div>
         <div class="word">Plan</div>
-        <div class="role">— what should appear</div>
+        <div class="role">— what this user needs</div>
         <p class="one-line" style="margin-top: 1rem;">A typed, validated value the model emits.</p>
       </div>
       <div class="card">
         <div class="glyph">C</div>
         <div class="word">Compile</div>
-        <div class="role">— how it becomes a surface</div>
+        <div class="role">— how the surface appears</div>
         <p class="one-line" style="margin-top: 1rem;">Plan in, Renderables out. Deterministic.</p>
       </div>
     </div>
@@ -1154,13 +1162,19 @@
       </div>
       <div class="rhs">
         <p class="lede">
-          The <em>Manifest</em> is what your application has declared it can do. It's the agent-readable interface to a real product — the database's <code>information_schema</code>, lifted to product capabilities.
+          The model is the <em>planner</em>. It maps between two grammars — the one the developer has declared possible, and the one the user is trying to express. The Manifest is the developer's side.
         </p>
         <p class="body">
-          A Resonance app names its <strong>datasets</strong> (deals, customers, orders), the <strong>dimensions and measures</strong> each accepts, the <strong>filters</strong> they understand, and the <strong>semantic primitives</strong> the model is allowed to use over them — rank, compare, distribute, segment, summarize. Eventually, actions.
+          The thing that makes an AI feature work isn't the model — it's the <em>judgment</em> behind it. Which datasets are worth opening. Which dimensions carry meaning. Which patterns earn the right to render. The model doesn't decide that. You do — once, in the Manifest.
         </p>
         <p class="body">
-          Plans bind against this manifest. A plan that names a dataset the app never declared fails at validation, before anything renders. The trust boundary is the type system.
+          It names — in the language the model already speaks — the <strong>datasets</strong> you trust, the <strong>dimensions and measures</strong> that matter, the <strong>filters</strong> you understand, and the <strong>semantic primitives</strong> the model is allowed to use over them: rank, compare, distribute, segment, summarize. Eventually, act.
+        </p>
+        <p class="body">
+          A declaration, not a prompt. <span class="yk">Database-independent.</span> <span class="yk">Model-independent.</span> <span class="yk">Renderer-independent</span> — though here it compiles to Phoenix. Swap the database. Swap the model. Swap the runtime. The Manifest still describes what your application <em>is</em>.
+        </p>
+        <p class="body">
+          Plans bind against it. A plan that names a dataset the app never declared fails at validation, before anything renders. The trust boundary is the type system. The planning surface is English.
         </p>
 
         <div class="ex">
@@ -1199,7 +1213,7 @@
           The <em>Plan</em> is a typed, validated value the model emits. A workspace is a goal, a layout, and a list of <strong>sections</strong>. Each section names a <strong>role</strong>, a presentation <strong>pattern</strong>, and a <strong>source</strong> — a typed tool call that returns a Result.
         </p>
         <p class="body">
-          The plan is a <span class="yk">value</span>. The rendered page is one expression of it. The saved JSON snapshot is another. The same plan replayed against tomorrow's data, with no new model call, is a third.
+          The plan is a <span class="yk">value</span>. The rendered surface is one expression of it. The saved JSON snapshot is another. The same plan replayed against tomorrow's data, with no new model call, is a third.
         </p>
 
         <div class="ex">
@@ -1236,10 +1250,10 @@
       </div>
       <div class="rhs">
         <p class="lede">
-          The <em>Compiler</em> takes a Plan in and produces Renderables out. It walks each section, resolves the source through your Resolver, hands the Result to a Presenter, stamps a stable identity, and produces a list of components Phoenix will mount.
+          <em>Compile</em> is the deterministic step after the model is done. Resonance takes a Plan in and produces Renderables out: it walks each section, resolves the source through your Resolver, hands the Result to a Presenter, stamps a stable identity, and produces a list of components Phoenix will mount.
         </p>
         <p class="body">
-          The compiler is <strong>total over valid plans</strong>. It can only fail on invalid plans — and validation catches those before compilation begins. Per-section failures become explicit error Renderables. Other sections render anyway.
+          Compile is <strong>deterministic over valid plans</strong>. Invalid plans fail before rendering. Per-section runtime failures become explicit error Renderables. Other sections render anyway.
         </p>
         <p class="body">
           Resonance composes <span class="yk">what should appear</span>. Phoenix runs <span class="yk">what appears</span>.
@@ -1279,8 +1293,8 @@
     <div class="canon-list">
       <div class="canon-row">
         <div class="when">REST · the 2000s</div>
-        <div class="what">Named the verbs between client and server. A decade of API design fell in behind it.</div>
-        <div class="acronym">CRUD</div>
+        <div class="what">Named resources and a uniform interface between client and server. A decade of API design fell in behind it.</div>
+        <div class="acronym">REST</div>
       </div>
       <div class="canon-row">
         <div class="when">Rails · the 2010s</div>
@@ -1302,13 +1316,14 @@
     <div class="tag">11 · in closing</div>
 
     <div class="closing-build stagger">
-      <div class="line">Soon, we <em>won't</em> build pages.</div>
-      <div class="line">We define values and UI patterns.</div>
-      <div class="line">The user says what they want.</div>
+      <div class="line">Soon, we <em>won't</em> hand-build every page.</div>
+      <div class="line">We'll declare the <em>grammar</em> of what the product can do.</div>
+      <div class="line">The model will map intent into that grammar.</div>
+      <div class="line">Resonance will <em>compile</em> the surface at runtime.</div>
     </div>
 
     <div class="closing-final reveal">
-      The model ships the <em>plan</em>.
+      No generated markup. A typed plan the app knows how to run.
     </div>
 
     <div class="closing-links reveal">

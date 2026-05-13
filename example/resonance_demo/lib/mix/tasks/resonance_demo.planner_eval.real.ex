@@ -197,14 +197,14 @@ defmodule Mix.Tasks.ResonanceDemo.PlannerEval.Real do
 
     ## Prompt Results
 
-    | Prompt | Status | Attempts | Sections | Primitives | Errors |
-    | --- | --- | ---: | ---: | --- | --- |
+    | Prompt | Status | Attempts | Sections | Primitives | Errors | Retry Errors |
+    | --- | --- | ---: | ---: | --- | --- | --- |
     #{Enum.map_join(rows, "\n", &markdown_row/1)}
     """
   end
 
   defp markdown_row(row) do
-    "| #{escape(row.prompt)} | `#{row.status}` | #{row.attempts} | #{row.section_count} | #{escape(Enum.join(row.primitives, ", "))} | #{escape(Enum.join(row.errors, "; "))} |"
+    "| #{escape(row.prompt)} | `#{row.status}` | #{row.attempts} | #{row.section_count} | #{escape(Enum.join(row.primitives, ", "))} | #{escape(Enum.join(row.errors, "; "))} | #{escape(Enum.join(row.retry_errors, "; "))} |"
   end
 
   defp escape(value) do
@@ -246,16 +246,22 @@ defmodule Mix.Tasks.ResonanceDemo.PlannerEval.Real do
         invented_pattern?: result.diagnostics.invented_pattern?,
         invented_primitive?: result.diagnostics.invented_primitive?,
         validation_error_codes: Enum.map(result.diagnostics.validation_error_codes, &to_string/1),
+        retry_validation_error_codes:
+          Enum.map(result.diagnostics.retry_validation_error_codes, &to_string/1),
+        retry_errors: retry_error_messages(Map.get(result, :retry_errors, [])),
         errors: error_messages(Map.get(result, :errors))
       }
     end)
   end
 
+  defp retry_error_messages(errors) when is_list(errors) do
+    Enum.map(errors, &validation_error_message/1)
+  end
+
+  defp retry_error_messages(_errors), do: []
+
   defp error_messages({:validation_failed, errors}) when is_list(errors) do
-    Enum.map(errors, fn error ->
-      path = error.path |> Enum.map_join(".", &to_string/1)
-      "#{path} #{error.code}: #{error.message}"
-    end)
+    Enum.map(errors, &validation_error_message/1)
   end
 
   defp error_messages({:renderable_errors, errors}) when is_list(errors) do
@@ -263,8 +269,7 @@ defmodule Mix.Tasks.ResonanceDemo.PlannerEval.Real do
       %{section_id: section_id, error: {:validation_failed, validation_errors}}
       when is_list(validation_errors) ->
         Enum.map(validation_errors, fn error ->
-          path = error.path |> Enum.map_join(".", &to_string/1)
-          "#{section_id}: #{path} #{error.code}: #{error.message}"
+          "#{section_id}: #{validation_error_message(error)}"
         end)
 
       %{section_id: section_id, error: error} ->
@@ -274,6 +279,18 @@ defmodule Mix.Tasks.ResonanceDemo.PlannerEval.Real do
 
   defp error_messages(nil), do: []
   defp error_messages(error), do: [inspect(error)]
+
+  defp validation_error_message(error) do
+    path = error.path |> Enum.map_join(".", &to_string/1)
+    details = validation_error_details(error)
+    "#{path} #{error.code}: #{error.message}#{details}"
+  end
+
+  defp validation_error_details(%{details: details}) when map_size(details) > 0 do
+    " details=#{inspect(details)}"
+  end
+
+  defp validation_error_details(_error), do: ""
 
   defp summary_line(evaluation, out_path, nil) do
     "Real-provider planner eval complete: #{evaluation.summary.compiled}/#{evaluation.summary.total} compiled. Wrote #{Path.expand(out_path)}"

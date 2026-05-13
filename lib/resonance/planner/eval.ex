@@ -19,7 +19,8 @@ defmodule Resonance.Planner.Eval do
           required(:diagnostics) => map(),
           optional(:plan) => Resonance.WorkspacePlan.t(),
           optional(:compiled) => WorkspaceCompiler.compiled_workspace(),
-          optional(:errors) => term()
+          optional(:errors) => term(),
+          optional(:retry_errors) => [map()]
         }
 
   @doc """
@@ -75,6 +76,8 @@ defmodule Resonance.Planner.Eval do
   defp evaluate_one(prompt, context, opts) do
     case Planner.plan_result(prompt, context, opts) do
       {:ok, %{plan: plan} = planner_result} ->
+        retry_errors = Map.get(planner_result, :retry_errors, [])
+
         case WorkspaceCompiler.compile(plan, context) do
           {:ok, compiled} ->
             case renderable_errors(compiled) do
@@ -87,7 +90,8 @@ defmodule Resonance.Planner.Eval do
                   attempts: planner_result.attempts,
                   retried?: planner_result.retried?,
                   recovered?: planner_result.recovered?,
-                  diagnostics: plan_diagnostics(plan, nil)
+                  retry_errors: retry_errors,
+                  diagnostics: plan_diagnostics(plan, nil, retry_errors)
                 }
 
               errors ->
@@ -102,7 +106,8 @@ defmodule Resonance.Planner.Eval do
                   attempts: planner_result.attempts,
                   retried?: planner_result.retried?,
                   recovered?: false,
-                  diagnostics: plan_diagnostics(plan, reason)
+                  retry_errors: retry_errors,
+                  diagnostics: plan_diagnostics(plan, reason, retry_errors)
                 }
             end
 
@@ -115,11 +120,14 @@ defmodule Resonance.Planner.Eval do
               attempts: planner_result.attempts,
               retried?: planner_result.retried?,
               recovered?: false,
-              diagnostics: plan_diagnostics(plan, reason)
+              retry_errors: retry_errors,
+              diagnostics: plan_diagnostics(plan, reason, retry_errors)
             }
         end
 
       {:error, planner_result} ->
+        retry_errors = Map.get(planner_result, :retry_errors, [])
+
         %{
           prompt: prompt,
           status: :invalid_plan,
@@ -127,14 +135,25 @@ defmodule Resonance.Planner.Eval do
           attempts: planner_result.attempts,
           retried?: planner_result.retried?,
           recovered?: false,
-          diagnostics: plan_diagnostics(nil, planner_result.reason)
+          retry_errors: retry_errors,
+          diagnostics: plan_diagnostics(nil, planner_result.reason, retry_errors)
         }
     end
   end
 
-  defp plan_diagnostics(nil, errors) do
+  defp plan_diagnostics(plan, errors, retry_errors) do
     validation_errors = validation_errors(errors)
+    retry_validation_errors = validation_error_list(retry_errors)
 
+    plan
+    |> base_plan_diagnostics(validation_errors)
+    |> Map.merge(%{
+      retry_error_count: length(retry_validation_errors),
+      retry_validation_error_codes: Enum.map(retry_validation_errors, & &1.code)
+    })
+  end
+
+  defp base_plan_diagnostics(nil, validation_errors) do
     %{
       section_count: 0,
       primitives: [],
@@ -146,8 +165,7 @@ defmodule Resonance.Planner.Eval do
     }
   end
 
-  defp plan_diagnostics(plan, errors) do
-    validation_errors = validation_errors(errors)
+  defp base_plan_diagnostics(plan, validation_errors) do
     sections = plan.sections || []
 
     %{
@@ -175,6 +193,9 @@ defmodule Resonance.Planner.Eval do
   end
 
   defp validation_errors(_errors), do: []
+
+  defp validation_error_list(errors) when is_list(errors), do: errors
+  defp validation_error_list(_errors), do: []
 
   defp renderable_errors(%{sections: sections}) when is_list(sections) do
     Enum.flat_map(sections, fn

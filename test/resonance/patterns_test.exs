@@ -50,6 +50,17 @@ defmodule Resonance.PatternsTest do
       assert :ok = Patterns.validate_section(section, Patterns.manifest(custom_patterns()))
     end
 
+    test "accepts entity lists as supporting context" do
+      section =
+        section(%{
+          role: :supporting_context,
+          pattern: :entity_list,
+          source: {:tool_call, tool_call("rank_entities")}
+        })
+
+      assert :ok = Patterns.validate_section(section, Patterns.default_manifest())
+    end
+
     test "rejects incompatible pattern roles" do
       section =
         section(%{

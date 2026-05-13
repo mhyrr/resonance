@@ -140,6 +140,15 @@ defmodule Resonance.Planner do
     Do not emit HEEx, HTML, CSS classes, Phoenix component modules, raw design
     atoms, persistence instructions, or mutation/action surfaces. Each section
     source must be a semantic primitive tool call with QueryIntent arguments.
+    QueryIntent filters must be an array of objects with field/op/value keys;
+    never emit a map keyed by field name. Sort objects must use field/direction
+    keys. Measures, dimensions, datasets, and filters must be exact declared
+    strings from the app capabilities. Each section's QueryIntent must match
+    one declared query_shape exactly: the same dimensions list and measures
+    allowed by that shape. Multi-dimension sections are allowed only when that
+    exact dimensions list is declared. If the requested analysis needs an
+    undeclared shape, split it into multiple sections that each use declared
+    shapes.
 
     Prefer 2-5 sections. Use a summary section when the prompt asks for a
     review, insight, recommendation, or account/deal focus. Choose narrow,
@@ -179,6 +188,11 @@ defmodule Resonance.Planner do
     Return a corrected #{@tool_name} tool call. Fix only the invalid plan fields.
     Keep the same contract: no HEEx, HTML, CSS classes, component modules, raw
     design atoms, persistence instructions, mutation runtime, or action surfaces.
+    If filters are present, emit them as a list of objects:
+    [{"field": "stage", "op": "=", "value": "negotiation"}].
+    Every corrected section must use one exact declared query_shape. Do not
+    combine dimensions unless that exact dimension list is declared; split
+    undeclared combinations into multiple valid sections.
     """
   end
 
@@ -211,7 +225,8 @@ defmodule Resonance.Planner do
          plan: validated_plan,
          attempts: attempt,
          retried?: attempt > 1,
-         recovered?: attempt > 1 and previous_errors not in [nil, []]
+         recovered?: attempt > 1 and previous_errors not in [nil, []],
+         retry_errors: previous_errors || []
        }}
     else
       {:error, {:validation_failed, errors}} = error ->
@@ -225,11 +240,19 @@ defmodule Resonance.Planner do
           opts,
           retries_remaining,
           attempt,
+          previous_errors,
           errors
         )
 
       {:error, reason} ->
-        {:error, %{reason: reason, attempts: attempt, retried?: attempt > 1, recovered?: false}}
+        {:error,
+         %{
+           reason: reason,
+           attempts: attempt,
+           retried?: attempt > 1,
+           recovered?: false,
+           retry_errors: previous_errors || []
+         }}
     end
   end
 
@@ -243,6 +266,7 @@ defmodule Resonance.Planner do
          opts,
          retries_remaining,
          attempt,
+         _previous_errors,
          errors
        )
        when retries_remaining > 0 do
@@ -272,10 +296,17 @@ defmodule Resonance.Planner do
          _opts,
          _retries,
          attempt,
+         previous_errors,
          _errors
        ) do
     {:error,
-     %{reason: elem(error, 1), attempts: attempt, retried?: attempt > 1, recovered?: false}}
+     %{
+       reason: elem(error, 1),
+       attempts: attempt,
+       retried?: attempt > 1,
+       recovered?: false,
+       retry_errors: previous_errors || []
+     }}
   end
 
   defp request_plan(prompt, context, capabilities, pattern_manifest, workspace_context, opts) do
@@ -376,11 +407,7 @@ defmodule Resonance.Planner do
                   type: "string",
                   enum: Registry.list()
                 },
-                arguments: %{
-                  type: "object",
-                  description:
-                    "QueryIntent-compatible primitive arguments: dataset, measures, dimensions, filters, sort, limit, title"
-                }
+                arguments: query_intent_arguments_schema()
               },
               required: ["name", "arguments"]
             }
@@ -403,4 +430,60 @@ defmodule Resonance.Planner do
 
   defp atom_strings(atoms), do: Enum.map(atoms, &Atom.to_string/1)
   defp enum_line(atoms), do: atoms |> atom_strings() |> Enum.join(", ")
+
+  defp query_intent_arguments_schema do
+    %{
+      type: "object",
+      description:
+        "QueryIntent-compatible primitive arguments. Use exact declared capability names.",
+      properties: %{
+        dataset: %{
+          type: "string",
+          description: "Declared dataset name"
+        },
+        measures: %{
+          type: "array",
+          items: %{type: "string"},
+          description: "Declared measure names, exactly as listed in app capabilities"
+        },
+        dimensions: %{
+          type: "array",
+          items: %{type: "string"},
+          description: "Declared dimension names, exactly as listed in app capabilities"
+        },
+        filters: %{
+          type: "array",
+          description: "List of filter objects. Never emit a map keyed by field name.",
+          items: %{
+            type: "object",
+            properties: %{
+              field: %{type: "string", description: "Declared filter field"},
+              op: %{
+                type: "string",
+                enum: ["=", "!=", ">", ">=", "<", "<=", "in", "not_in", "like"]
+              },
+              value: %{description: "Filter value"}
+            },
+            required: ["field", "op", "value"]
+          }
+        },
+        sort: %{
+          type: "object",
+          description: "Sort order. Use field/direction keys; do not use measure.",
+          properties: %{
+            field: %{type: "string"},
+            direction: %{type: "string", enum: ["asc", "desc"]}
+          },
+          required: ["field"]
+        },
+        limit: %{
+          type: "integer",
+          minimum: 1
+        },
+        title: %{type: "string"},
+        focus: %{type: "string"}
+      },
+      required: ["dataset", "measures", "title"]
+    }
+  end
 end

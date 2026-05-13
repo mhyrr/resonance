@@ -51,7 +51,7 @@ defmodule Resonance.Patterns do
     %{
       name: :entity_list,
       description: "Ranked list of entities for focused inspection.",
-      roles: [:focus_list, :detail, :primary],
+      roles: [:focus_list, :detail, :primary, :supporting_context],
       result_kinds: [:ranking],
       source_primitives: ["rank_entities"]
     },

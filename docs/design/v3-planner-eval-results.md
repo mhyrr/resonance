@@ -92,13 +92,20 @@ result data and does not branch per prompt.
 
 ## Real-Provider Hardening
 
-The first real-provider run exposed a useful boundary bug: the model emitted
-filters as a map keyed by field name, for example `%{"stage" => %{...}}`,
-instead of the declared list of filter maps. `QueryIntent.from_params/1` now
-rejects that shape as `{:invalid_field, :filters, "must be a list"}` instead of
-raising a function-clause error. Capability-invalid tool calls are also
-validated by `WorkspaceCompiler.compile/2` before section resolution when the
-resolver exposes structured capabilities.
+The first real-provider runs exposed two useful boundary bugs. First, the model
+emitted filters as a map keyed by field name, for example
+`%{"stage" => %{...}}`, instead of the declared list of filter maps.
+`QueryIntent.from_params/1` now rejects that shape as
+`{:invalid_field, :filters, "must be a list"}` instead of raising a
+function-clause error.
+
+Second, resolver capabilities were checked with `function_exported?/3` before
+ensuring the resolver module was loaded. In a fresh example-app task that could
+return an empty manifest, leaving planner and compiler validation without the
+structured CRM capability contract. `Resonance.Resolver.Capabilities` now
+ensures resolver modules are loaded before reading `describe/0`, and
+`WorkspaceCompiler.compile/2` validates tool calls against those structured
+capabilities before section resolution.
 
 ## Conclusion
 
@@ -107,9 +114,13 @@ CRM intent can become a valid typed `WorkspacePlan`, validation catches invented
 capabilities, and valid plans compile into Phoenix surfaces through the reusable
 workspace component.
 
-The next harder proof is a real-provider benchmark over the same 12 prompts. If
-that holds, TK-070 action surfaces become a reasonable next experiment. If it
-does not, the schema/capability contract needs tightening before actions.
+The next harder proof also passed on 2026-05-13:
+`docs/design/v3-planner-eval-real-results.md` records 12/12 valid plans and
+12/12 compiled workspaces with the real Anthropic provider. One prompt required
+a validation-feedback retry and recovered. That moves the remaining uncertainty
+from "can the planner satisfy the contract?" to product breadth, live
+exploration quality, persistence semantics, and eventually action-surface
+safety.
 
 Run that benchmark from the CRM example app with:
 

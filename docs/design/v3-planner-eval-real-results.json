@@ -1,0 +1,315 @@
+{
+  "started_at": "2026-05-13T19:54:36Z",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-5",
+  "summary": {
+    "total": 12,
+    "compiled": 12,
+    "compile_failed": 0,
+    "retried": 1,
+    "recovered": 1,
+    "invented_capability_failures": 0,
+    "invented_pattern_failures": 0,
+    "invented_primitive_failures": 0,
+    "valid_plans": 12,
+    "invalid_plans": 0,
+    "valid_plan_rate": 1.0,
+    "compile_rate": 1.0
+  },
+  "results": [
+    {
+      "id": "pipeline_health",
+      "status": "compiled",
+      "prompt": "Show me pipeline health by stage and owner.",
+      "errors": [],
+      "patterns": [
+        "metric_strip",
+        "summary_panel",
+        "data_table"
+      ],
+      "attempts": 1,
+      "section_count": 4,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "segment_population",
+        "rank_entities"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Stage mix, owner mix, and a summary section."
+    },
+    {
+      "id": "stuck_negotiation",
+      "status": "compiled",
+      "prompt": "Which deals are stuck in negotiation?",
+      "errors": [],
+      "patterns": [
+        "prose_summary",
+        "deal_focus_list",
+        "summary_panel"
+      ],
+      "attempts": 1,
+      "section_count": 3,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "summarize_findings",
+        "rank_entities"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Focused ranked deal list filtered to negotiation."
+    },
+    {
+      "id": "quarter_compare",
+      "status": "compiled",
+      "prompt": "Compare this quarter's pipeline to last quarter.",
+      "errors": [],
+      "patterns": [
+        "prose_summary",
+        "comparison_panel",
+        "data_table"
+      ],
+      "attempts": 1,
+      "section_count": 3,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "summarize_findings",
+        "compare_over_time"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Quarter trend over declared pipeline quarter data."
+    },
+    {
+      "id": "enterprise_account_review",
+      "status": "compiled",
+      "prompt": "Give me an account review for top enterprise deals.",
+      "errors": [],
+      "patterns": [
+        "prose_summary",
+        "deal_focus_list",
+        "summary_panel",
+        "entity_list"
+      ],
+      "attempts": 1,
+      "section_count": 4,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "summarize_findings",
+        "rank_entities",
+        "segment_population"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Enterprise account ranking plus deal focus context."
+    },
+    {
+      "id": "alice_focus",
+      "status": "compiled",
+      "prompt": "What should Alice focus on this week?",
+      "errors": [],
+      "patterns": [
+        "prose_summary",
+        "deal_focus_list",
+        "summary_panel",
+        "comparison_panel"
+      ],
+      "attempts": 1,
+      "section_count": 4,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "summarize_findings",
+        "rank_entities",
+        "segment_population",
+        "compare_over_time"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Alice-owned deal focus list sorted by value."
+    },
+    {
+      "id": "open_pipeline_by_owner",
+      "status": "compiled",
+      "prompt": "Show open pipeline by owner.",
+      "errors": [],
+      "patterns": [
+        "entity_list",
+        "summary_panel"
+      ],
+      "attempts": 1,
+      "section_count": 2,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "rank_entities",
+        "segment_population"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Owner pipeline excluding closed won/lost stages."
+    },
+    {
+      "id": "contact_funnel",
+      "status": "compiled",
+      "prompt": "What does the contact funnel look like?",
+      "errors": [],
+      "patterns": [
+        "summary_panel",
+        "entity_list"
+      ],
+      "attempts": 1,
+      "section_count": 2,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "segment_population",
+        "rank_entities"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Contact stages as a categorical funnel."
+    },
+    {
+      "id": "no_response_activity",
+      "status": "compiled",
+      "prompt": "Where are sales activities getting no response?",
+      "errors": [],
+      "patterns": [
+        "prose_summary",
+        "summary_panel"
+      ],
+      "attempts": 1,
+      "section_count": 2,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "summarize_findings",
+        "rank_entities"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Activity type mix filtered to no-response outcomes."
+    },
+    {
+      "id": "largest_deals",
+      "status": "compiled",
+      "prompt": "Rank the largest deals in the pipeline.",
+      "errors": [],
+      "patterns": [
+        "deal_focus_list"
+      ],
+      "attempts": 2,
+      "section_count": 1,
+      "retried": true,
+      "recovered": true,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "rank_entities"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Top deal list sorted by deal value."
+    },
+    {
+      "id": "proposal_pipeline",
+      "status": "compiled",
+      "prompt": "Summarize proposal-stage pipeline.",
+      "errors": [],
+      "patterns": [
+        "prose_summary",
+        "entity_list",
+        "summary_panel"
+      ],
+      "attempts": 1,
+      "section_count": 3,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "summarize_findings",
+        "rank_entities"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Proposal-stage summary and distribution."
+    },
+    {
+      "id": "forecast_vampires",
+      "status": "compiled",
+      "prompt": "Which opportunities are the forecast vampires: technically alive, still draining attention, and most likely to embarrass us on Friday?",
+      "errors": [],
+      "patterns": [
+        "prose_summary",
+        "deal_focus_list",
+        "summary_panel",
+        "entity_list"
+      ],
+      "attempts": 1,
+      "section_count": 4,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "summarize_findings",
+        "rank_entities",
+        "segment_population"
+      ],
+      "validation_error_codes": [],
+      "expectation": "High-value open deal focus with enough context to spot forecast risk."
+    },
+    {
+      "id": "board_packet_dashboard",
+      "status": "compiled",
+      "prompt": "Board packet is tomorrow. I need a compact CRM operating dashboard that tells me whether the pipeline is healthy, where revenue is stuck, whether the quarter is getting better or worse, and which accounts or owners need attention.\n\nKeep it read-only and executive-friendly: show the big pipeline picture first, then give me the specific account/deal focus areas I should ask the team about.",
+      "errors": [],
+      "patterns": [
+        "prose_summary",
+        "metric_strip",
+        "trend_panel",
+        "summary_panel",
+        "deal_focus_list"
+      ],
+      "attempts": 1,
+      "section_count": 5,
+      "retried": false,
+      "recovered": false,
+      "invented_capability?": false,
+      "invented_pattern?": false,
+      "invented_primitive?": false,
+      "primitives": [
+        "summarize_findings",
+        "segment_population",
+        "compare_over_time",
+        "rank_entities"
+      ],
+      "validation_error_codes": [],
+      "expectation": "Comprehensive multi-section dashboard across summary, trend, owner, account, and activity signals."
+    }
+  ],
+  "finished_at": "2026-05-13T19:56:34Z"
+}

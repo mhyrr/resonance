@@ -33,6 +33,18 @@ defmodule Resonance.Resolver.CapabilitiesTest do
     end
   end
 
+  describe "from_resolver/1" do
+    test "loads resolver modules before checking describe/0" do
+      resolver = Resonance.Test.StructuredResolver
+
+      :code.purge(resolver)
+      :code.delete(resolver)
+
+      assert {:ok, capabilities} = Capabilities.from_resolver(resolver)
+      assert Capabilities.dataset_names(capabilities) == ["deals"]
+    end
+  end
+
   describe "format_description/1" do
     test "renders datasets, filters, and query shapes for planner prompts" do
       description = Capabilities.format_description(crm_capabilities())
