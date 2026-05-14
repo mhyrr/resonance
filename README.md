@@ -2,6 +2,9 @@
 
 **Generative analysis surfaces for Phoenix LiveView.**
 
+> 📖 **Read the manifesto: [After the Page →](https://mhyrr.github.io/resonance/marketing/after-the-page.html)**
+> The thesis behind Resonance — why fixed pages are giving way to planner-legible product grammars, and what it means to build for models that compose your app at query time.
+
 An Elixir library that lets users ask questions about application data and receive composed, app-native UI built from semantic primitives and streamed via LiveView.
 
 > *Resonance lets the user's question pick from the developer's design system.*
