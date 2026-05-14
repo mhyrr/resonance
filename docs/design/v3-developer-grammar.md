@@ -27,7 +27,8 @@ old web:
   -> user navigates what the team anticipated
 
 planned-surface web:
-  resources + CRUD operations + constraints + patterns
+  resources + CRUD operations + workflows + constraints + patterns
+  + external capability catalogs
   -> declared product grammar
   -> model emits a plan
   -> Resonance compiles the surface
@@ -35,6 +36,15 @@ planned-surface web:
 ```
 
 The web primitives do not disappear. They become planner-legible.
+
+MCP fits this frame as a capability-source protocol, not as the whole product
+grammar.
+
+An MCP server can expose resources and tools. Resonance can treat those as
+importable capabilities, alongside app-local resources, context functions,
+patterns, and affordances. The planner should not see "anything the MCP server
+can call." It should see the subset the app has admitted into its product
+grammar.
 
 ## What We Have Proved
 
@@ -75,6 +85,23 @@ That matters because Resonance should not become a narrow CRM framework, admin
 framework, workflow framework, or internal-tools framework. It should provide
 the grammar substrate those frameworks can build on.
 
+For external workflows and functions, MCP is the useful corollary. It is a tool
+bus and catalog, not a replacement for the grammar:
+
+```text
+MCP resource        -> possible read shape / external resource
+MCP tool            -> possible operation / workflow step
+Resonance manifest  -> admitted product grammar
+WorkspacePlan       -> planned read/refine surface
+ActionPlan          -> planned transaction / workflow surface
+Compiler/executor   -> deterministic binding to app-owned runtime
+```
+
+The important word is "admitted." A capability can come from a Phoenix context,
+an Ecto-backed resolver, an HTTP API, an SDK, a background job, or an MCP tool.
+Resonance should normalize those sources into one planner-facing grammar before
+the model plans against them.
+
 ## The Developer's New Work
 
 The new work is semantic surfacing.
@@ -92,6 +119,7 @@ what those parts mean:
 - which constraints must hold
 - which patterns can render the result
 - which operations may be composed into a workflow
+- which external tools or resources are admitted into the grammar
 
 In a Phoenix application, this does not replace contexts, schemas, changesets,
 or LiveViews. It gives them a planner-facing contract.
@@ -106,12 +134,73 @@ LiveComponent/widget  -> interactive pattern
 Function component    -> render kit
 LiveView              -> runtime host
 Resonance manifest    -> planner-facing grammar
+MCP server            -> optional external capability source
 WorkspacePlan         -> planned surface value
 Compile               -> deterministic binding to app UI
 ```
 
 The developer is not writing less important code. The developer is writing code
 with a second audience: the planner.
+
+## MCP And Capability Catalogs
+
+MCP is closest to an API catalog for tools and resources. That is useful, but it
+is one layer too raw for Resonance to plan against directly.
+
+An MCP tool might say:
+
+```text
+name: create_deal
+input_schema: name, account_id, value, stage
+```
+
+That is callable. It is not yet a safe product affordance.
+
+The Resonance grammar still needs to know:
+
+- whether the operation is create, update, delete, or a higher workflow
+- who may run it
+- whether it requires confirmation
+- whether it supports dry-run or preview
+- whether it is reversible
+- what audit record should exist
+- which UI pattern can render input, preview, validation errors, and result
+- what workspace context should be shown before and after execution
+
+So the mapping should be:
+
+```text
+MCP exposes tools.
+The app admits selected tools into its Resonance manifest.
+The planner maps user intent onto admitted capabilities.
+Resonance validates and compiles the surface.
+The app executes through its runtime boundary.
+```
+
+That makes Resonance feel like an extension of MCP in the product direction:
+MCP standardizes how tools are exposed; Resonance standardizes how tools,
+resources, UI patterns, and affordances become safe, app-native surfaces.
+
+The wrong version is:
+
+```text
+user intent -> model chooses MCP tool -> tool runs
+```
+
+That is a tool picker.
+
+The right version is:
+
+```text
+user intent
+  -> WorkspacePlan / ActionPlan
+  -> validation against admitted capabilities
+  -> preview or confirmation when needed
+  -> app-owned execution
+  -> workspace result and audit trail
+```
+
+That is a product surface.
 
 ## The Grammar
 
@@ -331,6 +420,11 @@ That is the difference.
 The model did not invent a business process. It planned a surface over a
 declared process grammar.
 
+Some workflow steps may be backed by MCP tools rather than local context
+functions. That does not change the rule. The MCP tool is still only a backing
+implementation for an admitted operation. The grammar owns the preconditions,
+preview, confirmation, audit, and UI affordances.
+
 ## What This Means For Phoenix
 
 Phoenix already has the right primitives. The change is how deliberately they
@@ -494,6 +588,7 @@ CRUD operations
 constraints
 patterns
 workflow steps
+external tool/resource capabilities
 plans
 compile
 snapshots
@@ -532,6 +627,10 @@ Patterns:
 
 Composition:
   Which operation sequences are allowed, and where must the user confirm?
+
+External capabilities:
+  Which MCP tools, HTTP endpoints, SDK calls, or background jobs are admitted,
+  and what product operation does each one implement?
 ```
 
 That is the methodology.
@@ -552,7 +651,8 @@ The likely product surface is:
 
 ```text
 Manifest
-  The app's planner-facing resource, operation, constraint, and pattern grammar.
+  The app's planner-facing resource, operation, constraint, pattern, workflow,
+  and admitted external capability grammar.
 
 Plan
   A typed value emitted by the model for one user intent.
@@ -599,4 +699,3 @@ Users bring intent.
 The model plans a valid surface.
 The application compiles and runs it.
 ```
-
