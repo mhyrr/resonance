@@ -7,8 +7,8 @@ defmodule ResonanceDemoWeb.Widgets.PipelineFunnel do
   *count* and total *value*. The toggle calls `Deals.by_stage_distribution/1`
   directly — no Resonance machinery on the user-driven path.
 
-  Subscribes to the `"deals"` PubSub topic so the funnel auto-refreshes
-  whenever simulate fires.
+  External live updates come from the parent surface forwarding a refreshed
+  Renderable; this widget owns the measure toggle and rendering.
   """
 
   use Resonance.Widget
@@ -131,7 +131,9 @@ defmodule ResonanceDemoWeb.Widgets.PipelineFunnel do
               >
               </div>
             </div>
-            <div class="w-20 text-right text-xs font-medium text-gray-700 tabular-nums">{format_metric(row_value(row), @mode)}</div>
+            <div class="w-20 text-right text-xs font-medium text-gray-700 tabular-nums">
+              {format_metric(row_value(row), @mode)}
+            </div>
           </div>
         <% end %>
         <div :if={@rows == []} class="text-sm text-gray-400 italic px-2 py-3">

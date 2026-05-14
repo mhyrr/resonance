@@ -13,9 +13,9 @@ principle that makes this tractable:
 > Resonance is a **composer**. Phoenix is the **runtime**. Resonance composes
 > the page from the user's question; once the widget is mounted, Resonance is
 > gone from the runtime path. Widgets are real Phoenix LiveComponents — they
-> call your app contexts, manage local state, handle mutations, and react to
-> PubSub the way every other LiveComponent does. The library composes;
-> Phoenix runs.
+> call your app contexts, manage local state, handle mutations, and receive
+> parent-forwarded refreshes when PubSub says data changed. The library
+> composes; Phoenix runs.
 
 That's the whole idea. The LLM stays in semantics-land. It picks primitives,
 exactly as it does today. The presenter — which is the developer's seam — maps
@@ -109,7 +109,7 @@ The contract:
   carrying a `%Resonance.Renderable{}`. The widget reads `:props` for initial
   state. After that, everything is normal LiveComponent: `handle_event/3`
   calls your contexts, mutations broadcast on PubSub, the parent forwards
-  messages via `send_update`.
+  refreshed renderables via `send_update`.
 
 `use Resonance.Widget` is one line that pulls in `Phoenix.LiveComponent` and
 declares `@behaviour Resonance.Widget`. Developers write widgets the way they
@@ -193,8 +193,8 @@ layer between truth and presentation; v2 leans into that role.
 Because widgets are real LiveComponents, you handle live updates the way
 Phoenix already does it: subscribe to a `Phoenix.PubSub` topic in the
 **parent LiveView**, and on receiving a message call
-`Phoenix.LiveView.send_update/2` to push a refreshed `:renderable` (or fresh
-assigns) into the widget. LiveComponents share their parent process and
+`Phoenix.LiveView.send_update/2` to push a refreshed `:renderable` into the
+widget. LiveComponents share their parent process and
 can't subscribe to PubSub directly — but the parent owning the subscription
 is the standard Phoenix pattern, so this is the same code you'd write
 without Resonance in the picture.
@@ -207,8 +207,9 @@ the currently-selected widget on any message. This is how the demo's
 ## Mutations work the same way
 
 A widget that creates a deal calls `MyApp.Deals.create_deal/2` from
-`handle_event/3`. On success it broadcasts on a PubSub topic. Any other
-widget (or LiveView) listening on that topic refreshes itself. There is no
+`handle_event/3`. On success it broadcasts on a PubSub topic. Parent
+LiveViews or other processes listening on that topic refresh themselves or
+forward a refreshed Renderable to any widget that needs it. There is no
 Resonance API for mutations because there doesn't need to be — Phoenix
 already has one.
 
@@ -230,8 +231,9 @@ the issue.
   different primitive, v2 says "regenerate the report" (which already
   exists). Cross-primitive drilldown without regeneration is a later problem.
 - **No `Resonance.commit/4` and no mutation invalidation.** Widgets mutate
-  by calling app contexts directly. Other widgets refresh by subscribing to
-  PubSub. No dataset-dependency tracking in v2.
+  by calling app contexts directly. Parent surfaces subscribe to PubSub and
+  forward refreshed renderables to widgets that need them. No
+  dataset-dependency tracking in v2.
 - **No LLM capability tags in the system prompt.** The LLM stays fully
   unaware of interactivity in v2. If a Presenter has no interactive widget
   for a Result kind, it falls back to the read-only one. (This becomes a
@@ -326,8 +328,8 @@ one extra callback."
 5. Build interactive widgets in `example/resonance_demo` (one per primary
    Result kind: `:ranking`, `:distribution`, `:segmentation`, `:comparison`).
    Each calls `ResonanceDemo.Deals` directly from `handle_event/3`. The
-   playground's `on_mount` hook subscribes to PubSub so simulate updates
-   the rendered widget.
+   playground LiveView subscribes to PubSub from `on_mount` assigns so
+   simulate re-resolves the rendered widget.
 6. Document the convention: "a Resonance widget is a `use Resonance.Widget`
    LiveComponent. Implement `accepts_results/0`. Use Phoenix the way you
    always have. The library composes; Phoenix runs."

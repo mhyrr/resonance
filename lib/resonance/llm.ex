@@ -20,18 +20,26 @@ defmodule Resonance.LLM do
     openai: Resonance.LLM.Providers.OpenAI
   }
 
+  alias Resonance.WorkspaceContext
+
   @doc """
   Call the configured LLM with a prompt and tool schemas.
 
   Returns `{:ok, [%ToolCall{}]}` or `{:error, reason}`.
   """
-  @spec chat(String.t(), [map()], map()) :: {:ok, [Resonance.LLM.ToolCall.t()]} | {:error, term()}
-  def chat(prompt, tools, context \\ %{}) do
+  @spec chat(String.t(), [map()], map(), keyword()) ::
+          {:ok, [Resonance.LLM.ToolCall.t()]} | {:error, term()}
+  def chat(prompt, tools, context \\ %{}, call_opts \\ []) do
     config = Application.get_all_env(:resonance)
-    provider = resolve_provider(config[:provider])
+    provider = resolve_provider(Keyword.get(call_opts, :provider, config[:provider]))
 
-    system_prompt = build_system_prompt(context)
-    opts = config |> Keyword.drop([:provider]) |> Keyword.put(:system, system_prompt)
+    system_prompt = Keyword.get(call_opts, :system) || build_system_prompt(context)
+
+    opts =
+      config
+      |> Keyword.drop([:provider])
+      |> Keyword.merge(Keyword.drop(call_opts, [:provider, :system]))
+      |> Keyword.put(:system, system_prompt)
 
     metadata = %{provider: provider, tool_count: length(tools)}
 
@@ -44,6 +52,7 @@ defmodule Resonance.LLM do
   @doc false
   def build_system_prompt(context) do
     resolver = context[:resolver]
+    workspace_context = WorkspaceContext.from_context(context)
 
     today = Date.utc_today()
     current_month = Calendar.strftime(today, "%Y-%m")
@@ -74,11 +83,16 @@ defmodule Resonance.LLM do
     Available data is described below. Use these exact names.
     """
 
-    if resolver && function_exported?(resolver, :describe, 0) do
-      base <> "\n" <> resolver.describe()
-    else
-      base
-    end
+    base =
+      if workspace_context do
+        base <> "\n" <> WorkspaceContext.format_for_prompt(workspace_context)
+      else
+        base
+      end
+
+    if resolver && function_exported?(resolver, :describe, 0),
+      do: base <> "\n" <> Resonance.Resolver.format_description(resolver.describe()),
+      else: base
   end
 
   defp resolve_provider(name) when is_atom(name) and not is_nil(name) do

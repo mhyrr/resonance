@@ -5,8 +5,8 @@ defmodule Resonance do
   **Resonance lets the user's question pick from the developer's design system.**
 
   The LLM doesn't invent UI — the developer brings the look, the components,
-  and the data. Resonance is the runtime that lets a user's natural-language
-  question compose those into a view, at query time, live. Users ask
+  and the data. Resonance is the composer layer that lets a user's
+  natural-language question become a view, at query time, live. Users ask
   questions about application data and receive composed, app-native UI —
   reports, dashboards, contextual insights — built from semantic primitives
   and streamed in real-time via LiveView.
@@ -36,9 +36,10 @@ defmodule Resonance do
 
   Resonance composes the page from the user's question; once the widget is
   mounted, Resonance is gone from the runtime path. Widgets are real
-  LiveComponents: they call your app contexts from `handle_event/3`, subscribe
-  to PubSub for live updates, and handle mutations the way every other Phoenix
-  LiveComponent does. The library composes; Phoenix runs.
+  LiveComponents: they call your app contexts from `handle_event/3`, manage
+  local state, receive parent-forwarded refreshes, and handle mutations the
+  way every other Phoenix LiveComponent does. The library composes; Phoenix
+  runs.
 
   See `Resonance.Widget` for the full contract and `Resonance.Live.Playground`
   for a developer page that enumerates every loaded widget.

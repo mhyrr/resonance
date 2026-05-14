@@ -40,6 +40,8 @@ defmodule Resonance.Resolver do
       end
   """
 
+  alias Resonance.Resolver.Capabilities
+
   @type data_row :: %{
           required(:label) => String.t(),
           required(:value) => number(),
@@ -80,7 +82,7 @@ defmodule Resonance.Resolver do
   Optional — if not implemented, the LLM gets no dataset guidance and must
   rely entirely on the prompt.
   """
-  @callback describe() :: String.t()
+  @callback describe() :: String.t() | Capabilities.raw()
 
   @doc """
   Resolve a QueryIntent into data.
@@ -102,4 +104,46 @@ defmodule Resonance.Resolver do
               :ok | {:error, term()}
 
   @optional_callbacks [describe: 0, validate: 2]
+
+  @doc """
+  Return normalized structured capabilities for a resolver module.
+
+  Resolver modules may still return a free-form string from `describe/0`. In
+  that case the manifest contains the prompt description but no structured
+  datasets, so capability validation is skipped.
+  """
+  @spec capabilities(module() | nil) ::
+          {:ok, Capabilities.t()}
+          | {:error, {:validation_failed, [Capabilities.validation_error()]}}
+  def capabilities(resolver), do: Capabilities.from_resolver(resolver)
+
+  @doc """
+  Render a resolver description or capability manifest for LLM prompt context.
+  """
+  @spec format_description(Capabilities.raw() | Capabilities.t() | nil) :: String.t()
+  def format_description(description), do: Capabilities.format_description(description)
+
+  @doc """
+  Validate a `QueryIntent` against a resolver's structured capabilities.
+  """
+  @spec validate_intent(
+          Resonance.QueryIntent.t(),
+          module() | Capabilities.t() | Capabilities.raw()
+        ) ::
+          :ok | {:error, term()}
+  def validate_intent(%Resonance.QueryIntent{} = intent, resolver) when is_atom(resolver) do
+    with {:ok, capabilities} <- capabilities(resolver) do
+      case Capabilities.validate_intent(intent, capabilities) do
+        :ok -> :ok
+        {:error, errors} -> {:error, {:validation_failed, errors}}
+      end
+    end
+  end
+
+  def validate_intent(%Resonance.QueryIntent{} = intent, capabilities_or_description) do
+    case Capabilities.validate_intent(intent, capabilities_or_description) do
+      :ok -> :ok
+      {:error, errors} -> {:error, {:validation_failed, errors}}
+    end
+  end
 end

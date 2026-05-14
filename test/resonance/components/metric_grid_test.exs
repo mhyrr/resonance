@@ -98,6 +98,18 @@ defmodule Resonance.Components.MetricGridTest do
       assert html =~ "$2,500"
     end
 
+    test "formats atom currency values" do
+      html =
+        render_component(MetricGrid, %{
+          renderable_id: "g-1",
+          props: %{
+            metrics: [%{label: "Revenue", value: 2500, format: :currency}]
+          }
+        })
+
+      assert html =~ "$2,500"
+    end
+
     test "handles empty metrics list" do
       html =
         render_component(MetricGrid, %{

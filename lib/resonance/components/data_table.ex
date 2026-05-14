@@ -12,6 +12,7 @@ defmodule Resonance.Components.DataTable do
       assigns
       |> assign_new(:columns, fn -> infer_columns(assigns.props[:data] || []) end)
       |> assign_new(:sortable, fn -> assigns.props[:sortable] || false end)
+      |> assign_new(:format, fn -> assigns.props[:format] || %{} end)
 
     ~H"""
     <div class="resonance-component resonance-data-table">
@@ -24,7 +25,7 @@ defmodule Resonance.Components.DataTable do
         </thead>
         <tbody>
           <tr :for={row <- @props[:data] || []}>
-            <td :for={col <- @columns}><%= format_cell(row, col) %></td>
+            <td :for={col <- @columns}><%= format_cell(row, col, @format) %></td>
           </tr>
         </tbody>
       </table>
@@ -41,17 +42,39 @@ defmodule Resonance.Components.DataTable do
 
   defp infer_columns(_), do: []
 
-  defp format_cell(row, col) when is_map(row) do
-    val = row[col] || row[String.to_existing_atom(col)]
-    format_value(val)
-  rescue
-    ArgumentError -> row[col] || ""
+  defp format_cell(row, col, format) when is_map(row) do
+    val = cell_value(row, col)
+    format_value(val, field_format(format, col))
   end
 
-  defp format_value(nil), do: ""
+  defp cell_value(row, col) do
+    row[col] || row[String.to_existing_atom(col)]
+  rescue
+    ArgumentError -> row[col]
+  end
 
-  defp format_value(val) when is_float(val),
+  defp field_format(format, col) when is_map(format) do
+    Map.get(format, col) || existing_atom_format(format, col)
+  end
+
+  defp field_format(_format, _col), do: nil
+
+  defp existing_atom_format(format, col) do
+    Map.get(format, String.to_existing_atom(col))
+  rescue
+    ArgumentError -> nil
+  end
+
+  defp format_value(nil, _), do: ""
+
+  defp format_value(val, format) when format in ["currency", :currency] and is_number(val),
+    do: "$#{Resonance.Format.integer(val)}"
+
+  defp format_value(val, format) when format in ["percent", :percent] and is_number(val),
+    do: "#{Float.round(val * 100, 1)}%"
+
+  defp format_value(val, _) when is_float(val),
     do: :erlang.float_to_binary(Float.round(val, 2), decimals: 2)
 
-  defp format_value(val), do: to_string(val)
+  defp format_value(val, _), do: to_string(val)
 end

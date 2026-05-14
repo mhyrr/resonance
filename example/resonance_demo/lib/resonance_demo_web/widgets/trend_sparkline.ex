@@ -6,7 +6,8 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
   SVG sparkline and lets the user narrow the trend to a single deal stage.
   Stage chip clicks call `Deals.by_quarter/1` directly.
 
-  Subscribes to the `"deals"` PubSub topic for live updates.
+  External live updates come from the parent surface forwarding a refreshed
+  Renderable; this widget owns local filters and rendering.
   """
 
   use Resonance.Widget
@@ -142,7 +143,15 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
                 </linearGradient>
               </defs>
               <path d={@summary.fill} fill={"url(#grad-" <> @id <> ")"}></path>
-              <path d={@summary.path} fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path
+                d={@summary.path}
+                fill="none"
+                stroke="#3b82f6"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+              </path>
               <%= for {x, y} <- @summary.points do %>
                 <circle cx={x} cy={y} r="3" fill="#3b82f6"></circle>
               <% end %>
@@ -159,7 +168,9 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
         <div class="flex flex-col gap-2 min-w-[110px]">
           <div>
             <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Latest</div>
-            <div class="text-lg font-semibold text-gray-900 tabular-nums">${format_value(@summary.latest)}</div>
+            <div class="text-lg font-semibold text-gray-900 tabular-nums">
+              ${format_value(@summary.latest)}
+            </div>
           </div>
           <div>
             <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Peak</div>
@@ -238,7 +249,9 @@ defmodule ResonanceDemoWeb.Widgets.TrendSparkline do
     }
   end
 
-  defp format_value(n) when is_number(n) and n >= 1_000_000, do: "#{Float.round(n / 1_000_000, 2)}M"
+  defp format_value(n) when is_number(n) and n >= 1_000_000,
+    do: "#{Float.round(n / 1_000_000, 2)}M"
+
   defp format_value(n) when is_number(n) and n >= 1_000, do: "#{Float.round(n / 1_000, 1)}K"
   defp format_value(n) when is_number(n), do: Integer.to_string(trunc(n))
   defp format_value(_), do: "—"

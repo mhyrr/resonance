@@ -15,30 +15,104 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   @valid_datasets ~w(companies contacts deals activities)
 
+  @capabilities %{
+    description: "CRM demo data for companies, contacts, deals, and activities.",
+    datasets: [
+      %{
+        name: "companies",
+        description: "Accounts with industry, size, revenue, and region attributes.",
+        fields: ~w(name industry size revenue region),
+        measures: ["count(*)", "sum(revenue)", "avg(revenue)"],
+        dimensions: ~w(name industry region size),
+        filters: [
+          %{field: "industry", ops: ["="]},
+          %{field: "region", ops: ["="]},
+          %{field: "size", ops: ["="]}
+        ],
+        query_shapes: [
+          %{dimensions: [], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]},
+          %{dimensions: ["name"], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]},
+          %{dimensions: ["industry"], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]},
+          %{dimensions: ["region"], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]},
+          %{dimensions: ["size"], measures: ["count(*)", "sum(revenue)", "avg(revenue)"]}
+        ]
+      },
+      %{
+        name: "contacts",
+        description: "People in the CRM pipeline.",
+        fields: ~w(name email stage title company_id),
+        measures: ["count(*)"],
+        dimensions: ~w(name stage),
+        filters: [
+          %{field: "stage", ops: ["="]}
+        ],
+        query_shapes: [
+          %{dimensions: [], measures: ["count(*)"]},
+          %{dimensions: ["name"], measures: ["count(*)"]},
+          %{dimensions: ["stage"], measures: ["count(*)"]}
+        ]
+      },
+      %{
+        name: "deals",
+        description: "Sales opportunities with value, stage, close quarter, owner, and company.",
+        fields: ~w(name value stage close_date owner quarter company_id),
+        measures: ["count(*)", "sum(value)", "avg(value)"],
+        dimensions: ~w(name stage quarter owner),
+        filters: [
+          %{
+            field: "stage",
+            ops: ["=", "in", "not_in"],
+            values: ~w(prospecting discovery proposal negotiation closed_won closed_lost)
+          },
+          %{field: "quarter", ops: ["="]},
+          %{field: "owner", ops: ["="], values: ~w(Alice Bob Carol Dave)}
+        ],
+        query_shapes: [
+          %{dimensions: [], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["name"], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["stage"], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["quarter"], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["owner"], measures: ["count(*)", "sum(value)", "avg(value)"]},
+          %{dimensions: ["stage", "quarter"], measures: ["count(*)", "sum(value)", "avg(value)"]}
+        ]
+      },
+      %{
+        name: "activities",
+        description: "Sales activities linked to contacts.",
+        fields: ~w(type date outcome contact_id),
+        measures: ["count(*)"],
+        dimensions: ~w(type outcome),
+        filters: [
+          %{field: "type", ops: ["="], values: ~w(call email meeting demo follow_up)},
+          %{field: "outcome", ops: ["="], values: ~w(positive neutral negative no_response)}
+        ],
+        query_shapes: [
+          %{dimensions: [], measures: ["count(*)"]},
+          %{dimensions: ["type"], measures: ["count(*)"]},
+          %{dimensions: ["outcome"], measures: ["count(*)"]}
+        ]
+      }
+    ],
+    notes: [
+      "Deal stages are prospecting, discovery, proposal, negotiation, closed_won, and closed_lost.",
+      "Owners are Alice, Bob, Carol, and Dave.",
+      "Use quarter strings such as 2025-Q1 for quarter filters."
+    ]
+  }
+
   @impl true
   def describe do
-    """
-    Datasets:
-    - "companies" — fields: name, industry, size (Enterprise/Mid-Market/Small), revenue, region (West/East/South/Midwest)
-      measures: count(*), sum(revenue), avg(revenue)
-      dimensions: industry, region, size
-
-    - "contacts" — fields: name, email, stage (lead/qualified/opportunity/customer/churned), title, company_id
-      measures: count(*)
-      dimensions: stage
-
-    - "deals" — fields: name, value, stage (prospecting/discovery/proposal/negotiation/closed_won/closed_lost), close_date, owner (Alice/Bob/Carol/Dave), quarter (e.g. 2025-Q1), company_id
-      measures: count(*), sum(value), avg(value)
-      dimensions: stage, quarter, owner
-
-    - "activities" — fields: type (call/email/meeting/demo/follow_up), date, outcome (positive/neutral/negative/no_response), contact_id
-      measures: count(*)
-      dimensions: type, outcome
-    """
+    @capabilities
   end
 
   @impl true
-  def validate(%Resonance.QueryIntent{dataset: dataset}, _context) do
+  def validate(%Resonance.QueryIntent{} = intent, _context) do
+    with :ok <- validate_dataset(intent.dataset) do
+      Resonance.Resolver.validate_intent(intent, @capabilities)
+    end
+  end
+
+  defp validate_dataset(dataset) do
     if dataset in @valid_datasets,
       do: :ok,
       else: {:error, {:unknown_dataset, dataset}}
@@ -170,14 +244,22 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   # --- Contacts ---
 
+  defp query_for(%{dataset: "contacts", dimensions: ["name"]} = intent) do
+    q =
+      Contact
+      |> apply_contact_filters(intent.filters)
+      |> select_count_by_dimension(:name, intent)
+
+    {:ok, q}
+  end
+
   defp query_for(%{dataset: "contacts", dimensions: ["stage"]} = intent) do
     q =
       Contact
       |> apply_contact_filters(intent.filters)
-      |> group_by([c], c.stage)
-      |> select([c], %{label: c.stage, value: count(c.id)})
+      |> select_count_by_dimension(:stage, intent)
 
-    {:ok, apply_query_modifiers(q, intent)}
+    {:ok, q}
   end
 
   defp query_for(%{dataset: "contacts"} = intent) do
@@ -195,20 +277,18 @@ defmodule ResonanceDemo.CRM.Resolver do
     q =
       Activity
       |> apply_activity_filters(intent.filters)
-      |> group_by([a], a.type)
-      |> select([a], %{label: a.type, value: count(a.id)})
+      |> select_count_by_dimension(:type, intent)
 
-    {:ok, apply_query_modifiers(q, intent)}
+    {:ok, q}
   end
 
   defp query_for(%{dataset: "activities", dimensions: ["outcome"]} = intent) do
     q =
       Activity
       |> apply_activity_filters(intent.filters)
-      |> group_by([a], a.outcome)
-      |> select([a], %{label: a.outcome, value: count(a.id)})
+      |> select_count_by_dimension(:outcome, intent)
 
-    {:ok, apply_query_modifiers(q, intent)}
+    {:ok, q}
   end
 
   defp query_for(%{dataset: "activities"} = intent) do
@@ -290,6 +370,14 @@ defmodule ResonanceDemo.CRM.Resolver do
     end
   end
 
+  defp select_count_by_dimension(query, label_field, intent) do
+    query
+    |> group_by([record], field(record, ^label_field))
+    |> apply_count_sort(intent.sort)
+    |> select([record], %{label: field(record, ^label_field), value: count(record.id)})
+    |> apply_limit(intent.limit)
+  end
+
   # --- Filter helpers ---
 
   defp apply_deal_filters(query, nil), do: query
@@ -297,10 +385,24 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   defp apply_deal_filters(query, filters) do
     Enum.reduce(filters, query, fn
-      %{field: "stage", op: "=", value: v}, q -> where(q, [d], d.stage == ^v)
-      %{field: "quarter", op: "=", value: v}, q -> where(q, [d], d.quarter == ^v)
-      %{field: "owner", op: "=", value: v}, q -> where(q, [d], d.owner == ^v)
-      filter, q -> log_unsupported_filter("deals", filter); q
+      %{field: "stage", op: "=", value: v}, q ->
+        where(q, [d], d.stage == ^v)
+
+      %{field: "stage", op: "in", value: values}, q when is_list(values) ->
+        where(q, [d], d.stage in ^values)
+
+      %{field: "stage", op: "not_in", value: values}, q when is_list(values) ->
+        where(q, [d], d.stage not in ^values)
+
+      %{field: "quarter", op: "=", value: v}, q ->
+        where(q, [d], d.quarter == ^v)
+
+      %{field: "owner", op: "=", value: v}, q ->
+        where(q, [d], d.owner == ^v)
+
+      filter, q ->
+        log_unsupported_filter("deals", filter)
+        q
     end)
   end
 
@@ -309,10 +411,18 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   defp apply_company_filters(query, filters) do
     Enum.reduce(filters, query, fn
-      %{field: "industry", op: "=", value: v}, q -> where(q, [c], c.industry == ^v)
-      %{field: "region", op: "=", value: v}, q -> where(q, [c], c.region == ^v)
-      %{field: "size", op: "=", value: v}, q -> where(q, [c], c.size == ^v)
-      filter, q -> log_unsupported_filter("companies", filter); q
+      %{field: "industry", op: "=", value: v}, q ->
+        where(q, [c], c.industry == ^v)
+
+      %{field: "region", op: "=", value: v}, q ->
+        where(q, [c], c.region == ^v)
+
+      %{field: "size", op: "=", value: v}, q ->
+        where(q, [c], c.size == ^v)
+
+      filter, q ->
+        log_unsupported_filter("companies", filter)
+        q
     end)
   end
 
@@ -321,8 +431,12 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   defp apply_contact_filters(query, filters) do
     Enum.reduce(filters, query, fn
-      %{field: "stage", op: "=", value: v}, q -> where(q, [c], c.stage == ^v)
-      filter, q -> log_unsupported_filter("contacts", filter); q
+      %{field: "stage", op: "=", value: v}, q ->
+        where(q, [c], c.stage == ^v)
+
+      filter, q ->
+        log_unsupported_filter("contacts", filter)
+        q
     end)
   end
 
@@ -331,9 +445,15 @@ defmodule ResonanceDemo.CRM.Resolver do
 
   defp apply_activity_filters(query, filters) do
     Enum.reduce(filters, query, fn
-      %{field: "type", op: "=", value: v}, q -> where(q, [a], a.type == ^v)
-      %{field: "outcome", op: "=", value: v}, q -> where(q, [a], a.outcome == ^v)
-      filter, q -> log_unsupported_filter("activities", filter); q
+      %{field: "type", op: "=", value: v}, q ->
+        where(q, [a], a.type == ^v)
+
+      %{field: "outcome", op: "=", value: v}, q ->
+        where(q, [a], a.outcome == ^v)
+
+      filter, q ->
+        log_unsupported_filter("activities", filter)
+        q
     end)
   end
 
@@ -351,10 +471,25 @@ defmodule ResonanceDemo.CRM.Resolver do
   defp apply_sort(query, %{direction: :asc}), do: order_by(query, [s], asc: :value)
   defp apply_sort(query, _), do: query
 
+  defp apply_count_sort(query, nil), do: query
+
+  defp apply_count_sort(query, %{direction: :asc}),
+    do: order_by(query, [record], asc: count(record.id))
+
+  defp apply_count_sort(query, %{direction: :desc}),
+    do: order_by(query, [record], desc: count(record.id))
+
+  defp apply_count_sort(query, _sort), do: query
+
   # For ungrouped queries where we need to sort by the actual column
   defp apply_sort_by_field(query, nil, _field), do: query
-  defp apply_sort_by_field(query, %{direction: :desc}, field), do: order_by(query, [s], desc: ^field)
-  defp apply_sort_by_field(query, %{direction: :asc}, field), do: order_by(query, [s], asc: ^field)
+
+  defp apply_sort_by_field(query, %{direction: :desc}, field),
+    do: order_by(query, [s], desc: ^field)
+
+  defp apply_sort_by_field(query, %{direction: :asc}, field),
+    do: order_by(query, [s], asc: ^field)
+
   defp apply_sort_by_field(query, _, _field), do: query
 
   defp apply_limit(query, nil), do: query

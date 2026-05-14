@@ -55,6 +55,16 @@ defmodule Resonance.Components.DataTableTest do
       assert html =~ "<td>3.14</td>"
     end
 
+    test "formats cells from field-level format metadata" do
+      html =
+        render_component(DataTable, %{
+          renderable_id: "t-1",
+          props: %{data: [%{"name" => "Acme", "value" => 2500}], format: %{value: :currency}}
+        })
+
+      assert html =~ "<td>$2,500</td>"
+    end
+
     test "renders title when provided" do
       html =
         render_component(DataTable, %{

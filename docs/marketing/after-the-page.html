@@ -1,0 +1,1608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>After the Page · A developer's manifesto</title>
+<meta name="description" content="The user's intent picks the surface, not the team's guess. A developer's view of how web applications are authored when a typed plan sits between intent and Phoenix surface." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Newsreader:opsz,ital,wght@6..72,0..1,200..800&family=JetBrains+Mono:wght@300..700&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --bg:       #14110C;
+    --bg-1:     #1B1812;
+    --bg-2:     #211D16;
+    --bg-deep:  #0A0907;
+    --paper:    #EFE5D0;
+    --paper-2:  #D6CBB2;
+    --paper-mute: #8A8170;
+    --paper-soft: #5F5849;
+    --rule:     #322C22;
+    --rule-2:   #4A4231;
+    --orange:   #D8651D;
+    --orange-2: #E27420;
+    --orange-d: #6E3210;
+    --warn:     #FF6B35;
+    --leaf:     #BFD68A;
+
+    --serif-display: "Fraunces", "Times New Roman", serif;
+    --serif-body:    "Newsreader", "Georgia", serif;
+    --mono:          "JetBrains Mono", "Menlo", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--paper);
+    font-family: var(--serif-body);
+    font-optical-sizing: auto;
+    font-weight: 380;
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(242, 194, 0, 0.025), transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(239, 229, 208, 0.02), transparent 55%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 0.95 0 0 0 0 0.85 0 0 0 0.03 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    background-attachment: fixed, fixed, fixed;
+  }
+
+  ::selection { background: var(--orange); color: var(--bg); }
+
+  /* ---------- frame chrome ---------- */
+  .frame-top, .frame-bot {
+    position: fixed; left: 0; right: 0;
+    z-index: 20;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 28px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+    pointer-events: none;
+  }
+  .frame-top { top: 0; border-bottom: 1px solid var(--rule); background: linear-gradient(to bottom, rgba(20,17,12,0.94), rgba(20,17,12,0.7) 80%, transparent); }
+  .frame-bot { bottom: 0; border-top: 1px solid var(--rule); background: linear-gradient(to top, rgba(20,17,12,0.94), rgba(20,17,12,0.7) 80%, transparent); }
+
+  .frame-top .left, .frame-top .right,
+  .frame-bot .left, .frame-bot .right { pointer-events: auto; }
+
+  .wordmark {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 30, "WONK" 1;
+    font-style: italic;
+    font-weight: 480;
+    color: var(--paper);
+    font-size: 18px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .wordmark .dot {
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--orange);
+    transform: rotate(45deg);
+    vertical-align: middle;
+    margin: 0 0.55em 4px 0;
+  }
+  .wordmark em { font-style: italic; color: var(--orange); }
+
+  .counter { color: var(--paper); }
+  .counter .cur { color: var(--orange); }
+  .counter .sep { color: var(--paper-soft); margin: 0 0.4em; }
+
+  .nav-hint {
+    display: flex; align-items: center; gap: 14px;
+    color: var(--paper-mute);
+  }
+  .nav-hint .keys {
+    display: inline-flex; gap: 4px;
+  }
+  .nav-hint .key {
+    display: inline-flex; width: 16px; height: 16px;
+    align-items: center; justify-content: center;
+    border: 1px solid var(--rule-2);
+    font-size: 10px;
+    color: var(--paper-2);
+  }
+
+  .section-eyebrow {
+    color: var(--paper);
+  }
+  .section-eyebrow .lab { color: var(--orange); }
+
+  /* ---------- deck ---------- */
+  .deck {
+    height: 100vh;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+  }
+  .deck::-webkit-scrollbar { display: none; }
+
+  .slide {
+    position: relative;
+    min-height: 100vh;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    padding: 92px 6vw 84px;
+    display: grid;
+    place-items: center;
+  }
+
+  .slide-inner {
+    width: 100%;
+    max-width: 1180px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* tag/eyebrow inside slide */
+  .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 1.4rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .tag::before {
+    content: "";
+    display: inline-block;
+    width: 22px; height: 1px;
+    background: var(--orange);
+  }
+
+  /* typography */
+  h1, h2, h3, h4 {
+    font-family: var(--serif-display);
+    font-optical-sizing: auto;
+    color: var(--paper);
+    margin: 0;
+    line-height: 0.96;
+    text-wrap: balance;
+  }
+
+  .display {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1;
+    font-weight: 440;
+    font-size: clamp(2.8rem, 8.4vw, 8.2rem);
+    line-height: 0.92;
+    letter-spacing: -0.028em;
+  }
+  .display em {
+    font-style: italic;
+    font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1;
+    color: var(--orange);
+    font-weight: 420;
+  }
+
+  .h-slide {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 96, "SOFT" 30, "WONK" 0;
+    font-weight: 540;
+    font-size: clamp(1.9rem, 4.4vw, 3.4rem);
+    line-height: 1.02;
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
+  .h-slide em {
+    font-style: italic;
+    font-variation-settings: "opsz" 96, "SOFT" 100, "WONK" 1;
+    color: var(--orange);
+  }
+
+  .h-slide + .dek,
+  .h-slide + .lede,
+  .h-slide + .body { margin-top: 1.6rem; }
+
+  .dek {
+    font-family: var(--serif-body);
+    font-style: italic;
+    font-weight: 380;
+    font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+    line-height: 1.45;
+    color: var(--paper-2);
+    text-wrap: balance;
+    max-width: 56ch;
+  }
+
+  .lede {
+    font-family: var(--serif-body);
+    font-weight: 400;
+    font-size: clamp(1.05rem, 1.5vw, 1.22rem);
+    line-height: 1.5;
+    color: var(--paper);
+    text-wrap: pretty;
+    max-width: 60ch;
+  }
+
+  .body, .body p {
+    font-family: var(--serif-body);
+    font-weight: 380;
+    font-size: clamp(0.98rem, 1.25vw, 1.08rem);
+    line-height: 1.55;
+    color: var(--paper-2);
+    text-wrap: pretty;
+    max-width: 64ch;
+  }
+  .body p { margin: 0 0 0.9em 0; }
+  .body p:last-child { margin-bottom: 0; }
+  .body em { color: var(--paper); font-style: italic; }
+  .body strong { color: var(--paper); font-weight: 600; }
+  .body .yk { color: var(--orange); font-weight: 500; font-style: normal; }
+  .body code, .mono-inline {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    color: var(--paper);
+    background: var(--bg-1);
+    border: 1px solid var(--rule);
+    padding: 1px 6px;
+  }
+
+  /* axiom */
+  .axiom {
+    position: relative;
+    margin-top: 2.4rem;
+    padding-left: 28px;
+    border-left: 3px solid var(--orange);
+    max-width: 60ch;
+  }
+  .axiom .axiom-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 0.7rem;
+  }
+  .axiom .axiom-body {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 96, "SOFT" 70, "WONK" 0;
+    font-style: italic;
+    font-weight: 380;
+    font-size: clamp(1.45rem, 2.9vw, 2.3rem);
+    line-height: 1.08;
+    letter-spacing: -0.012em;
+    color: var(--paper);
+    text-wrap: balance;
+  }
+  .axiom .axiom-body em { color: var(--orange); }
+
+  /* hero ----------- */
+  .hero .display { max-width: 18ch; }
+  .hero-foot {
+    margin-top: 2.8rem;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    flex-wrap: wrap; gap: 1.4rem;
+  }
+  .hero-foot .dek { margin: 0; max-width: 42ch; }
+  .hero-meta {
+    display: flex; flex-direction: column; gap: 4px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+    text-align: right;
+  }
+  .hero-meta .v { color: var(--orange); }
+
+  /* ============ pipeline diagram (slide 4) ============ */
+  .pipeline {
+    margin-top: 2.2rem;
+    border: 1px solid var(--rule-2);
+    background: var(--bg-deep);
+    padding: 26px 32px;
+    overflow-x: auto;
+  }
+  .pipeline-row {
+    display: flex; align-items: center; gap: 18px;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    color: var(--paper-2);
+    white-space: nowrap;
+  }
+  .pipeline-row .node {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 50, "WONK" 0;
+    font-style: normal;
+    font-weight: 500;
+    font-size: clamp(1.05rem, 1.7vw, 1.3rem);
+    color: var(--paper);
+    padding: 6px 12px;
+    border: 1px solid var(--rule-2);
+    background: var(--bg-1);
+  }
+  .pipeline-row .node.opaque {
+    background: var(--paper);
+    color: var(--bg);
+    border-color: var(--paper);
+  }
+  .pipeline-row .node.glass {
+    color: var(--orange);
+    border-color: var(--orange);
+  }
+  .pipeline-row .node em {
+    font-style: italic;
+  }
+  .pipeline-row .arr { color: var(--orange); font-size: 14px; }
+
+  .pipeline-foot {
+    margin-top: 14px;
+    display: flex; flex-wrap: wrap; gap: 22px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--paper-mute);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .pipeline-foot .legend-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .pipeline-foot .chip {
+    display: inline-block; width: 10px; height: 10px;
+  }
+  .pipeline-foot .chip.opaque { background: var(--paper); }
+  .pipeline-foot .chip.glass { background: transparent; border: 1px solid var(--orange); }
+
+  @media (max-width: 720px) {
+    .pipeline-row { flex-direction: column; align-items: flex-start; gap: 8px; white-space: normal; }
+    .pipeline-row .arr { transform: rotate(90deg); }
+  }
+
+  /* ============ six-layer poster (slide 6) ============ */
+  .six-grid {
+    margin-top: 2.2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border-top: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
+  }
+  .six-grid .cell {
+    padding: 26px 22px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    display: flex; flex-direction: column; gap: 0;
+  }
+  .six-grid .num {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.26em;
+    color: var(--orange);
+  }
+  .six-grid .name {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 40, "WONK" 0;
+    font-weight: 580;
+    font-size: clamp(1.3rem, 2.2vw, 1.75rem);
+    color: var(--paper);
+    margin: 0.6rem 0 0.6rem;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+  }
+  .six-grid .what {
+    font-family: var(--serif-body);
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: var(--paper-2);
+  }
+  @media (max-width: 820px) {
+    .six-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ============ compare (two-column) ============ */
+  .compare {
+    margin-top: 2.2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
+  }
+  .compare .col {
+    padding: 28px 26px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .compare .col-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 1rem;
+  }
+  .compare .col-label.cool {
+    color: var(--paper-mute);
+  }
+  .compare .col h3 {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 30, "WONK" 0;
+    font-weight: 540;
+    font-size: clamp(1.25rem, 2vw, 1.65rem);
+    color: var(--paper);
+    margin: 0 0 1rem;
+    line-height: 1.1;
+  }
+  .compare .col h3 em {
+    font-style: italic;
+    color: var(--orange);
+  }
+  .compare .col p, .compare .col ul {
+    font-family: var(--serif-body);
+    font-size: 0.99rem;
+    line-height: 1.55;
+    color: var(--paper-2);
+    margin: 0 0 0.8rem;
+  }
+  .compare .col ul {
+    padding-left: 1.1rem;
+  }
+  .compare .col li {
+    margin-bottom: 0.55rem;
+  }
+  .compare .col li strong {
+    color: var(--paper);
+    font-weight: 600;
+    font-style: normal;
+  }
+  .compare .col code, .compare .col .mono-row {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--paper);
+    background: var(--bg-deep);
+    border: 1px solid var(--rule);
+    padding: 2px 7px;
+    display: inline-block;
+  }
+  .compare .col .flow {
+    font-family: var(--mono);
+    font-size: 0.92rem;
+    line-height: 1.7;
+    color: var(--paper);
+    background: var(--bg-deep);
+    border: 1px solid var(--rule);
+    padding: 14px 16px;
+    margin-top: 0.4rem;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .compare .col .flow .arr { color: var(--orange); }
+  .compare .col .flow .mute { color: var(--paper-soft); }
+  .compare .col .kicker {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 80, "WONK" 0;
+    font-style: italic;
+    font-weight: 460;
+    font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+    color: var(--orange);
+    margin-top: 0.8rem;
+    text-wrap: balance;
+  }
+  @media (max-width: 820px) {
+    .compare { grid-template-columns: 1fr; }
+  }
+
+  /* ============ four-block ============ */
+  .four-grid {
+    margin-top: 2.2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
+  }
+  .four-grid .block {
+    padding: 28px 26px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .four-grid .block .label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--orange);
+  }
+  .four-grid .block h3 {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 40, "WONK" 0;
+    font-weight: 540;
+    font-size: clamp(1.3rem, 2.2vw, 1.7rem);
+    color: var(--paper);
+    margin: 0.5rem 0 0.6rem;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+  .four-grid .block p {
+    font-family: var(--serif-body);
+    font-size: 0.96rem;
+    line-height: 1.5;
+    color: var(--paper-2);
+    margin: 0;
+  }
+  @media (max-width: 820px) {
+    .four-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ============ promote path ============ */
+  .promote-path {
+    margin-top: 2.4rem;
+    display: grid;
+    grid-template-columns: 1fr 28px 1fr 28px 1fr 28px 1fr 28px 1fr;
+    align-items: center;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 30px 0;
+  }
+  .promote-path .step {
+    text-align: center;
+    padding: 0 8px;
+  }
+  .promote-path .step .pn {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    color: var(--paper-mute);
+  }
+  .promote-path .step .pname {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 50, "WONK" 0;
+    font-weight: 540;
+    font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+    color: var(--paper);
+    margin-top: 0.35rem;
+    line-height: 1.2;
+  }
+  .promote-path .step.last .pname {
+    color: var(--orange);
+  }
+  .promote-path .arr {
+    text-align: center;
+    color: var(--orange);
+    font-family: var(--mono);
+    font-size: 16px;
+  }
+  @media (max-width: 820px) {
+    .promote-path { grid-template-columns: 1fr; padding: 8px 0; }
+    .promote-path .arr { display: none; }
+    .promote-path .step { padding: 14px 0; border-bottom: 1px solid var(--rule); }
+    .promote-path .step:last-child { border-bottom: 0; }
+  }
+
+  /* ============ role rows ============ */
+  .role-rows {
+    margin-top: 2.2rem;
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    border-top: 1px solid var(--rule);
+  }
+  .role-rows .role-l, .role-rows .role-r {
+    padding: 22px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .role-rows .role-l {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--orange);
+    align-self: center;
+  }
+  .role-rows .role-r {
+    font-family: var(--serif-body);
+    font-size: clamp(1rem, 1.5vw, 1.15rem);
+    line-height: 1.55;
+    color: var(--paper-2);
+    align-self: center;
+    padding-left: 8px;
+  }
+  .role-rows .role-r em {
+    color: var(--paper);
+    font-style: italic;
+  }
+  .role-rows .role-r strong {
+    color: var(--paper);
+    font-weight: 600;
+  }
+  @media (max-width: 720px) {
+    .role-rows { grid-template-columns: 1fr; }
+    .role-rows .role-l { padding-bottom: 4px; border-bottom: 0; }
+    .role-rows .role-r { padding-left: 0; padding-top: 4px; }
+  }
+
+  /* ============ numbered steps ============ */
+  .steps {
+    margin-top: 2.2rem;
+    border-top: 1px solid var(--rule);
+  }
+  .steps .step-row {
+    display: grid;
+    grid-template-columns: 84px 1fr;
+    gap: 22px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: baseline;
+  }
+  .steps .step-num {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1;
+    font-weight: 380;
+    font-style: italic;
+    font-size: clamp(2.6rem, 4.4vw, 3.6rem);
+    line-height: 0.9;
+    color: var(--orange);
+  }
+  .steps .step-text {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 60, "SOFT" 40, "WONK" 0;
+    font-weight: 500;
+    font-size: clamp(1.05rem, 1.8vw, 1.35rem);
+    color: var(--paper);
+    line-height: 1.35;
+    text-wrap: balance;
+  }
+  .steps .step-text em {
+    color: var(--orange);
+    font-style: italic;
+  }
+  .steps .step-text .mono-inline {
+    background: var(--bg-deep);
+  }
+
+  /* ============ code panel (slide 10) ============ */
+  .code-panel {
+    margin-top: 2rem;
+    border: 1px solid var(--rule-2);
+    background: var(--bg-deep);
+    overflow: hidden;
+  }
+  .code-panel .code-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--paper-mute);
+  }
+  .code-panel .code-head .y { color: var(--orange); }
+  .code-panel .code-body {
+    padding: 18px 22px 22px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--paper);
+    overflow-x: auto;
+  }
+  .code-panel .code-body pre {
+    margin: 0;
+    color: var(--paper);
+    font-family: inherit;
+    white-space: pre;
+  }
+  .code-panel pre em {
+    color: var(--orange);
+    font-style: italic;
+  }
+  .code-panel .c-mute { color: var(--paper-soft); }
+  .code-panel .c-key { color: var(--paper-2); }
+  .code-panel .c-y { color: var(--orange); }
+  .code-panel .c-com { color: var(--paper-soft); font-style: italic; }
+
+  /* ============ scope (shipped/argued) ============ */
+  .scope-grid {
+    margin-top: 2.2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
+  }
+  .scope-grid .scope-cell {
+    padding: 28px 26px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .scope-grid .scope-cell.shipped { background: var(--bg-2); }
+  .scope-grid .scope-cell .head {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    color: var(--orange);
+  }
+  .scope-grid .scope-cell.argued .head { color: var(--paper-mute); }
+  .scope-grid .scope-cell ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-family: var(--serif-body);
+    font-size: 0.98rem;
+    line-height: 1.6;
+    color: var(--paper-2);
+  }
+  .scope-grid .scope-cell li {
+    padding: 4px 0 4px 24px;
+    position: relative;
+  }
+  .scope-grid .scope-cell.shipped li::before {
+    content: "✓";
+    position: absolute; left: 0;
+    color: var(--leaf);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .scope-grid .scope-cell.argued li::before {
+    content: "→";
+    position: absolute; left: 0;
+    color: var(--orange);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  @media (max-width: 820px) {
+    .scope-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ============ closing ============ */
+  .closing-build {
+    display: grid; gap: 1.2rem;
+    width: 100%;
+    max-width: none;
+  }
+  .closing-build .line {
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 96, "SOFT" 60, "WONK" 0;
+    font-style: italic;
+    font-weight: 440;
+    font-size: clamp(1.4rem, 3vw, 2.1rem);
+    line-height: 1.15;
+    color: var(--paper-2);
+    white-space: nowrap;
+  }
+  .closing-build .line em { color: var(--orange); font-style: italic; }
+  .closing-final {
+    margin-top: 2rem;
+    font-family: var(--serif-display);
+    font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1;
+    font-style: italic;
+    font-weight: 380;
+    font-size: clamp(2.4rem, 7vw, 5.6rem);
+    line-height: 0.94;
+    letter-spacing: -0.028em;
+    color: var(--paper);
+    text-wrap: balance;
+  }
+  .closing-final em { color: var(--orange); }
+  .closing-links {
+    margin-top: 2.6rem;
+    display: flex; gap: 28px; flex-wrap: wrap;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .closing-links a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 2px;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  .closing-links a:hover { color: var(--orange); border-bottom-color: var(--orange); }
+
+  @media (max-width: 760px) {
+    .closing-build .line {
+      white-space: normal;
+      text-wrap: balance;
+    }
+  }
+
+  /* ============ reveal animation ============ */
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+                transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .visible.reveal, .visible .reveal { opacity: 1; transform: none; }
+
+  .stagger > * {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .visible .stagger > * { opacity: 1; transform: none; }
+  .visible .stagger > *:nth-child(1) { transition-delay: 80ms; }
+  .visible .stagger > *:nth-child(2) { transition-delay: 160ms; }
+  .visible .stagger > *:nth-child(3) { transition-delay: 240ms; }
+  .visible .stagger > *:nth-child(4) { transition-delay: 320ms; }
+  .visible .stagger > *:nth-child(5) { transition-delay: 400ms; }
+  .visible .stagger > *:nth-child(6) { transition-delay: 480ms; }
+  .visible .stagger > *:nth-child(7) { transition-delay: 560ms; }
+  .visible .stagger > *:nth-child(8) { transition-delay: 640ms; }
+
+  /* hero word stagger */
+  .hero h1 .w {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(16px);
+    animation: rise 0.85s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .hero h1 .w:nth-child(1) { animation-delay: 0.18s; }
+  .hero h1 .w:nth-child(2) { animation-delay: 0.28s; }
+  .hero h1 .w:nth-child(3) { animation-delay: 0.38s; }
+  .hero h1 .w:nth-child(4) { animation-delay: 0.48s; }
+  .hero h1 .w:nth-child(5) { animation-delay: 0.58s; }
+  .hero h1 .w:nth-child(6) { animation-delay: 0.70s; }
+  .hero h1 .w:nth-child(7) { animation-delay: 0.82s; }
+  .hero h1 .w:nth-child(8) { animation-delay: 0.94s; }
+  .hero h1 .w:nth-child(9) { animation-delay: 1.06s; }
+
+  /* progress rail */
+  .rail {
+    position: fixed; right: 18px; top: 50%; transform: translateY(-50%);
+    z-index: 25;
+    display: flex; flex-direction: column; gap: 9px;
+  }
+  .rail .dot {
+    width: 5px; height: 5px;
+    background: var(--rule-2);
+    border-radius: 0;
+    transform: rotate(45deg);
+    transition: background 0.2s ease, transform 0.2s ease;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .rail .dot.active { background: var(--orange); transform: rotate(45deg) scale(1.4); }
+  @media (max-width: 720px) { .rail { display: none; } }
+
+  /* reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+    .deck { scroll-behavior: auto; }
+    .reveal, .hero h1 .w, .stagger > * {
+      opacity: 1 !important; transform: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== frame chrome ===== -->
+<div class="frame-top">
+  <div class="left wordmark"><span class="dot" aria-hidden="true"></span>Resonance<em> · a developer's manifesto</em></div>
+  <div class="right counter">
+    <span class="cur" id="cur">01</span><span class="sep">/</span><span id="tot">20</span>
+  </div>
+</div>
+
+<div class="frame-bot">
+  <div class="left section-eyebrow" id="eyebrow"><span class="lab">·</span> &nbsp;the opening</div>
+  <div class="right nav-hint">
+    <span>navigate</span>
+    <span class="keys">
+      <span class="key">↑</span><span class="key">↓</span>
+    </span>
+  </div>
+</div>
+
+<div class="rail" id="rail" aria-hidden="true"></div>
+
+<!-- ===== deck ===== -->
+<main class="deck" id="deck">
+
+<!-- ============ 01 ·HERO ============ -->
+<section class="slide hero" data-eyebrow="the opening">
+  <div class="slide-inner">
+    <h1 class="display">
+      <span class="w">You</span>
+      <span class="w">don't</span>
+      <span class="w">ship</span>
+      <span class="w">pages</span>
+      <span class="w">anymore.</span>
+      <span class="w">You</span>
+      <span class="w"><em>ship</em></span>
+      <span class="w"><em>the</em></span>
+      <span class="w"><em>grammar.</em></span>
+    </h1>
+
+    <div class="hero-foot">
+      <p class="dek">
+        The user's intent picks the surface, not the team's guess. A developer's view of what comes after the hand-authored page.
+      </p>
+      <div class="hero-meta">
+        <span>A developer's manifesto &nbsp;<span class="v">·</span>&nbsp; 2026</span>
+        <span>Resonance · Elixir + Phoenix LiveView</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 ·A PAGE IS A GUESS ============ -->
+<section class="slide" data-eyebrow="the problem">
+  <div class="slide-inner">
+    <div class="tag">02 · the problem</div>
+    <h2 class="h-slide">Every page in your app is <em>a bet</em>.</h2>
+
+    <div class="body" style="margin-top: 1.6rem;">
+      <p class="lede">
+        Someone on the team thought: a user in this situation will need this view, in this layout, with these affordances, so the team built that page. Most pages get traffic; some don't.
+      </p>
+      <p>
+        The good guesses get used; the bad guesses become <span class="yk">dead-link archaeology</span>. This worked when the cost of misreading a user was an unused screen. It works less well now that the cost is invisibility: the user opens your app, doesn't see what they came for, and switches to a tool that gets out of the way.
+      </p>
+    </div>
+
+    <div class="axiom">
+      <div class="axiom-tag">Premise 01</div>
+      <div class="axiom-body">Pages were <em>one expression</em> of the product. Not the product.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 03 ·WHAT PAGES CONCEALED ============ -->
+<section class="slide" data-eyebrow="the surface">
+  <div class="slide-inner">
+    <div class="tag">03 · the surface beneath the page</div>
+    <h2 class="h-slide">The real surface area was <em>already there</em>.</h2>
+
+    <div class="body" style="margin-top: 1.6rem;">
+      <p class="lede">
+        Underneath every page is the data the application owns, the operations it permits, the constraints those operations honor, the auth scopes that gate them, and the UI patterns the team has chosen to render results.
+      </p>
+      <p>
+        Take any noun in your app. A <code>Deal</code> probably has a list view, a show view, an edit form, and a few special-case pages like <code>ArchiveStaleDealsLive</code>. Each is a bet on which slice of the <em>same data</em> will get used, pre-bundled into a route before the user shows up.
+      </p>
+      <p>
+        Pages don't get harder to write. They stop being the unit of work. The unit of work becomes <span class="yk">the grammar itself</span>: the declared surface area, written once, against which any plan can compile.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 ·THE SHIFT (DIAGRAM) ============ -->
+<section class="slide" data-eyebrow="the shift">
+  <div class="slide-inner">
+    <div class="tag">04 · the architectural shift</div>
+    <h2 class="h-slide">Insert a <em>typed plan</em> between intent and surface.</h2>
+
+    <div class="code-panel" style="margin-top: 2rem;">
+      <div class="code-head">
+        <span><span class="y">▸ intent to surface</span></span>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--paper-mute);">1 opaque · the rest glass</span>
+      </div>
+      <div class="code-body">
+<pre>user intent
+  <span class="c-y">→</span> planner (LLM)               <span class="c-mute">[opaque]</span>
+    <span class="c-y">→</span> <em>WorkspacePlan</em>             <span class="c-mute">[glass · typed value]</span>
+      <span class="c-y">→</span> validation              <span class="c-mute">[glass · against the Manifest]</span>
+        <span class="c-y">→</span> compile               <span class="c-mute">[glass · deterministic]</span>
+          <span class="c-y">→</span> Renderables         <span class="c-mute">[glass · stable identity]</span>
+            <span class="c-y">→</span> Phoenix renders the surface</pre>
+      </div>
+    </div>
+
+    <div class="body" style="margin-top: 1.6rem;">
+      <p>
+        One step is <span class="yk">opaque</span>: the planner. It sits in the position a query optimizer sits in a SQL database; a learned mechanism doing the matching, surrounded by glass on both sides. Everything downstream is <span class="yk">deterministic</span>. The plan is a value you can store, diff, and rerun tomorrow without a new model call.
+      </p>
+    </div>
+
+    <div class="axiom">
+      <div class="axiom-tag">Premise 02</div>
+      <div class="axiom-body"><em>Resonance composes</em> the surface.<br /><em>Phoenix renders</em> it.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 ·CRUD SUBSTRATE ============ -->
+<section class="slide" data-eyebrow="the substrate">
+  <div class="slide-inner">
+    <div class="tag">05 · the substrate stays</div>
+    <h2 class="h-slide">The data layer stays. The <em>surface</em> gets generated.</h2>
+
+    <div class="body" style="margin-top: 1.6rem;">
+      <p class="lede">
+        CRUD is still the base calculus: <code>Create</code>, <code>Read</code>, <code>Update</code>, <code>Delete</code>, over resources owned by Phoenix contexts, persisted by Ecto, gated by authorization scopes you wrote. Nothing in that stack is replaced.
+      </p>
+      <p>
+        What changes is who decides which CRUD operation gets the user's screen real estate at this moment.
+      </p>
+      <p>
+        Domain verbs like <code>archive_deal</code>, <code>refund_invoice</code>, <code>approve_request</code>, or <code>escalate_ticket</code> are <em>named compositions</em>: CRUD plus constraints plus confirmations plus patterns. The substrate is unchanged; <span class="yk">the addressability changes</span>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 ·THE MANIFEST (SIX LAYERS) ============ -->
+<section class="slide" data-eyebrow="the manifest">
+  <div class="slide-inner">
+    <div class="tag">06 · what you author</div>
+    <h2 class="h-slide">Six layers form the <em>developer's grammar</em>.</h2>
+    <p class="dek" style="margin-top: 0.8rem;">
+      What the developer authors, once, in a form the planner can read. A typed catalog.
+    </p>
+
+    <div class="six-grid">
+      <div class="cell">
+        <span class="num">I</span>
+        <div class="name">Resources</div>
+        <div class="what">The nouns. <code style="font-family: var(--mono); font-size: 0.85em; color: var(--paper);">Deal</code>, <code style="font-family: var(--mono); font-size: 0.85em; color: var(--paper);">Account</code>, <code style="font-family: var(--mono); font-size: 0.85em; color: var(--paper);">Contact</code>. Each declares its product-meaningful fields.</div>
+      </div>
+      <div class="cell">
+        <span class="num">II</span>
+        <div class="name">Read shapes</div>
+        <div class="what">Typed queries the planner can ask. Rank, segment, compare, summarize, distribute.</div>
+      </div>
+      <div class="cell">
+        <span class="num">III</span>
+        <div class="name">Mutation shapes</div>
+        <div class="what">Create, update, delete with declared boundaries, validations, confirmations, after-state.</div>
+      </div>
+      <div class="cell">
+        <span class="num">IV</span>
+        <div class="name">Constraints</div>
+        <div class="what">The old web's hidden skeleton, made explicit. Your operating envelope.</div>
+      </div>
+      <div class="cell">
+        <span class="num">V</span>
+        <div class="name">Patterns</div>
+        <div class="what">The surfaces your app can render. The planner picks the pattern; the compiler binds the code.</div>
+      </div>
+      <div class="cell">
+        <span class="num">VI</span>
+        <div class="name">External capabilities</div>
+        <div class="what">MCP tools, HTTP, SDKs, background jobs. Admitted into the grammar one at a time.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 07 ·RESOURCES & READS ============ -->
+<section class="slide" data-eyebrow="resources & reads">
+  <div class="slide-inner">
+    <div class="tag">07 · resources &amp; read shapes</div>
+    <h2 class="h-slide">Nouns the planner sees. <em>Verbs</em> it's allowed to ask.</h2>
+
+    <div class="compare">
+      <div class="col">
+        <div class="col-label">I · Resources</div>
+        <h3>The product-meaningful nouns.</h3>
+        <p>
+          Not necessarily one-to-one with database tables. <code>StaleDeal</code> and <code>AtRiskRenewal</code> may be named read shapes over the same <code>Deal</code> table. Each resource declares the fields safe and meaningful to expose, which is usually narrower than the schema's full surface.
+        </p>
+        <p class="kicker">Schemas describe rows. Resources describe meaning.</p>
+      </div>
+      <div class="col">
+        <div class="col-label">II · Read shapes</div>
+        <h3>Five typed primitives.</h3>
+        <ul>
+          <li><strong><code>rank_entities</code></strong> · who's largest, fastest, most stuck</li>
+          <li><strong><code>segment_population</code></strong> · how the set breaks down</li>
+          <li><strong><code>compare_over_time</code></strong> · trends and deltas</li>
+          <li><strong><code>show_distribution</code></strong> · shape of a measure across a dimension</li>
+          <li><strong><code>summarize_findings</code></strong> · prose summary over a result</li>
+        </ul>
+        <p class="kicker">A plan that asks against measures the app never declared fails at validation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 08 ·MUTATIONS & CONSTRAINTS ============ -->
+<section class="slide" data-eyebrow="mutations & constraints">
+  <div class="slide-inner">
+    <div class="tag">08 · mutation shapes &amp; constraints</div>
+    <h2 class="h-slide">Boundaries the planner <em>can't cross</em>.</h2>
+
+    <div class="compare">
+      <div class="col">
+        <div class="col-label">III · Mutation shapes</div>
+        <h3>CRUD, but explicit.</h3>
+        <p>
+          Each mutation declares allowed parameters, validations, authorization scope, confirmation requirements, reversibility, side effects, and after-state. Your changesets and contexts already encode most of this. The Manifest doesn't bypass them; it advertises them.
+        </p>
+        <p class="kicker" style="color: var(--paper-mute); font-size: 0.95rem;">Read workspaces are proven today. Mutation surfaces are the next frontier.</p>
+      </div>
+      <div class="col">
+        <div class="col-label">IV · Constraints</div>
+        <h3>The operating envelope.</h3>
+        <p>
+          Changeset validations. Database constraints. Authorization policies. Tenant scope. Idempotency. Audit requirements. Confirmations. Irreversibility gates.
+        </p>
+        <p>
+          The old web's hidden skeleton, made explicit. They keep the model from planning <em>outside</em> what your app actually supports.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 09 ·PATTERNS & EXTERNAL CAPABILITIES ============ -->
+<section class="slide" data-eyebrow="patterns & capabilities">
+  <div class="slide-inner">
+    <div class="tag">09 · patterns &amp; external capabilities</div>
+    <h2 class="h-slide">What can render. What can be <em>admitted</em>.</h2>
+
+    <div class="compare">
+      <div class="col">
+        <div class="col-label">V · Patterns</div>
+        <h3>The model picks a pattern. Not HTML.</h3>
+        <ul>
+          <li><strong><code>record_list</code></strong> · scannable rows with selection</li>
+          <li><strong><code>detail_panel</code></strong> · one record, one focus</li>
+          <li><strong><code>bar_chart</code></strong>, <strong><code>trend_panel</code></strong> · shape-bearing surfaces</li>
+          <li><strong><code>metric_strip</code></strong>, <strong><code>prose_summary</code></strong> · context-bearing surfaces</li>
+        </ul>
+        <p class="kicker">The compiler binds the pattern to your function components and LiveComponents.</p>
+      </div>
+      <div class="col">
+        <div class="col-label">VI · External capabilities</div>
+        <h3>Admitted, not auto-flowed.</h3>
+        <p>
+          MCP tools, HTTP endpoints, SDK calls, background jobs: any capability your app uses. Each is admitted into the grammar one at a time, with an annotation that says which product operation it implements.
+        </p>
+        <p class="kicker">A capability the app hasn't admitted does not exist as far as the planner is concerned.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10 ·MANIFEST IN CODE ============ -->
+<section class="slide" data-eyebrow="in code">
+  <div class="slide-inner">
+    <div class="tag">10 · the manifest in code</div>
+    <h2 class="h-slide">A Manifest you could <em>read on a napkin</em>.</h2>
+    <p class="dek" style="margin-top: 0.8rem;">
+      Illustrative, not the final API. The shape of what a developer authors once.
+    </p>
+
+    <div class="code-panel">
+      <div class="code-head">
+        <span><span class="y">▸ manifest.ex</span> &nbsp;·&nbsp; CRM grammar fragment</span>
+        <span style="font-family: var(--mono); font-size: 10px; color: var(--paper-mute);">elixir</span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-com"># Resource: the nouns the planner sees</span>
+<span class="c-y">resource</span> <span class="c-key">:deal</span> <span class="c-key">do</span>
+  <span class="c-y">fields</span> <span class="c-key">do</span>
+    <span class="c-y">field</span> <span class="c-key">:name</span>,        <span class="c-key">:string</span>
+    <span class="c-y">field</span> <span class="c-key">:stage</span>,       <span class="c-key">:enum</span>, values: [<span class="c-key">:qualified</span>, <span class="c-key">:proposal</span>, <span class="c-key">:negotiation</span>, <span class="c-key">:closed</span>]
+    <span class="c-y">field</span> <span class="c-key">:owner_id</span>,    <span class="c-key">:user_ref</span>
+    <span class="c-y">field</span> <span class="c-key">:value_cents</span>, <span class="c-key">:money</span>
+    <span class="c-y">field</span> <span class="c-key">:closed_at</span>,   <span class="c-key">:datetime</span>, nullable: <span class="c-key">true</span>
+  <span class="c-key">end</span>
+
+  <span class="c-y">measures</span>   [<span class="c-key">:count</span>, <span class="c-key">:sum_value</span>, <span class="c-key">:avg_value</span>]
+  <span class="c-y">dimensions</span> [<span class="c-key">:stage</span>, <span class="c-key">:owner</span>, <span class="c-key">:closed_at</span>, <span class="c-key">:region</span>]
+  <span class="c-y">filters</span>    [<span class="c-key">:stage</span>, <span class="c-key">:owner</span>, <span class="c-key">:closed_at</span>]
+<span class="c-key">end</span>
+
+<span class="c-com"># Operation: CRUD with declared boundaries</span>
+<span class="c-y">operation</span> <span class="c-key">:archive_deals</span> <span class="c-key">do</span>
+  <span class="c-y">crud</span>      <span class="c-key">:update</span>
+  <span class="c-y">resource</span>  <span class="c-key">:deal</span>
+  <span class="c-y">updates</span>   [<span class="c-key">:archived_at</span>]
+
+  <span class="c-y">accepts_many</span>           <span class="c-key">true</span>
+  <span class="c-y">requires_confirmation</span>  <span class="c-key">true</span>
+  <span class="c-y">reversible_with</span>        <span class="c-key">:restore_deals</span>
+
+  <span class="c-y">validate_with</span> <span class="c-key">CRM.Deals</span>, <span class="c-key">:archive_changeset</span>
+  <span class="c-y">perform_with</span>  <span class="c-key">CRM.Deals</span>, <span class="c-key">:archive_deals</span>
+<span class="c-key">end</span>
+
+<span class="c-com"># Admitted primitives and patterns</span>
+<span class="c-y">primitives</span> [<span class="c-key">:rank_entities</span>, <span class="c-key">:segment_population</span>,
+            <span class="c-key">:compare_over_time</span>, <span class="c-key">:summarize_findings</span>]
+
+<span class="c-y">patterns</span>   [<span class="c-key">:bar_chart</span>, <span class="c-key">:trend_panel</span>, <span class="c-key">:entity_list</span>,
+            <span class="c-key">:data_table</span>, <span class="c-key">:prose_summary</span>]</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 11 ·MCP & MPC ============ -->
+<section class="slide" data-eyebrow="mcp & mpc">
+  <div class="slide-inner">
+    <div class="tag">11 · MCP and the missing P</div>
+    <h2 class="h-slide">MCP gets you the wire. <em>MPC</em> gets you the surface.</h2>
+
+    <div class="body" style="margin-top: 1.6rem;">
+      <p class="lede">
+        MCP, the Model Context Protocol, is a standard worth using. It solves one specific problem: how a tool exposes itself to a model. Resources, tools, prompts, catalog-style handshakes. We're for it.
+      </p>
+      <p>
+        MCP is the wire format for <em>"here is a tool you can call."</em> It is not a product grammar. A model that can plan a safe, app-native surface needs more: which operations require confirmation, which patterns can render which results, what the audit trail looks like, what the after-state should show.
+      </p>
+    </div>
+
+    <div class="six-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-top: 1.8rem;">
+      <div class="cell">
+        <span class="num">M</span>
+        <div class="name">Manifest</div>
+        <div class="what">What the app has declared it can do. Resources, reads, mutations, constraints, patterns, admitted capabilities.</div>
+      </div>
+      <div class="cell">
+        <span class="num">P</span>
+        <div class="name">Plan</div>
+        <div class="what">What this user needs, this moment. A typed value the planner emits, validated against the Manifest.</div>
+      </div>
+      <div class="cell">
+        <span class="num">C</span>
+        <div class="name">Compile</div>
+        <div class="what">The deterministic step from plan to surface. Plan in, Renderables out. Phoenix mounts.</div>
+      </div>
+    </div>
+
+    <div class="axiom" style="margin-top: 1.8rem;">
+      <div class="axiom-tag">Premise 03</div>
+      <div class="axiom-body">If MCP standardizes how capabilities are <em>exposed</em>,<br />MPC standardizes how capabilities become <em>safe surfaces</em>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 12 ·TWO PICTURES ============ -->
+<section class="slide" data-eyebrow="two pictures">
+  <div class="slide-inner">
+    <div class="tag">12 · two pictures</div>
+    <h2 class="h-slide">A tool picker is <em>not</em> a product surface.</h2>
+
+    <div class="compare">
+      <div class="col">
+        <div class="col-label cool">The wrong picture</div>
+        <h3>Pick. Call. Render.</h3>
+        <div class="flow"><span class="mute">user intent</span>
+  <span class="arr">→</span>  model picks MCP tool
+    <span class="arr">→</span>  tool runs</div>
+        <p class="kicker" style="color: var(--paper-mute);">A demo. A parlor trick with an API key.</p>
+      </div>
+      <div class="col">
+        <div class="col-label">The right picture</div>
+        <h3>Plan. Validate. Preview. Execute.</h3>
+        <div class="flow"><span class="mute">user intent</span>
+  <span class="arr">→</span>  plan
+    <span class="arr">→</span>  validation against admitted capabilities
+      <span class="arr">→</span>  preview or confirmation
+        <span class="arr">→</span>  app-owned execution
+          <span class="arr">→</span>  result + audit</div>
+        <p class="kicker">A product surface.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 13 ·PHOENIX REPURPOSED ============ -->
+<section class="slide" data-eyebrow="phoenix repurposed">
+  <div class="slide-inner">
+    <div class="tag">13 · what Phoenix becomes</div>
+    <h2 class="h-slide">Phoenix doesn't change. <em>Its parts</em> get repurposed.</h2>
+
+    <div class="four-grid">
+      <div class="block">
+        <div class="label">Contexts</div>
+        <h3>The operation boundary.</h3>
+        <p>Still the right place for <code>CRM.Deals.archive_deals/2</code> and <code>Billing.Invoices.refund_invoice/3</code>. The Manifest points at context functions. Schemas and LiveView events are left alone.</p>
+      </div>
+      <div class="block">
+        <div class="label">LiveView</div>
+        <h3>Runtime host for planned workspaces.</h3>
+        <p>A route like <code>/workspace</code> doesn't ship pre-decided sections; it shows whatever the plan compiled into. Lifecycle, PubSub, URL state, auth re-checks: Phoenix owns it.</p>
+      </div>
+      <div class="block">
+        <div class="label">Components</div>
+        <h3>Pattern implementations.</h3>
+        <p>Function components and LiveComponents become how a pattern is realized. The planner picks <code>record_list</code>; the app decides how <code>record_list</code> becomes Phoenix code.</p>
+      </div>
+      <div class="block">
+        <div class="label">Routes</div>
+        <h3>Entry points for hardened workspaces.</h3>
+        <p>They don't disappear. They become stable points for hosts, saved workspaces, canonical resources. Not every useful surface needs a route before a user can ask for it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 14 ·A DAY IN THE LIFE ============ -->
+<section class="slide" data-eyebrow="a day in the life">
+  <div class="slide-inner">
+    <div class="tag">14 · a day building a feature</div>
+    <h2 class="h-slide"><em>"Show me at-risk renewals for the next 60 days, grouped by owner."</em></h2>
+
+    <div class="compare">
+      <div class="col">
+        <div class="col-label cool">The page-centric day</div>
+        <h3>Anticipation is the bottleneck.</h3>
+        <ul>
+          <li>Every variation on the same noun gets its own screen.</li>
+          <li>Someone has to predict the variation before the user asks.</li>
+          <li>Routes accumulate; so does the maintenance bill.</li>
+          <li>The user finds the right screen, or doesn't.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="col-label">The planned-surface day</div>
+        <h3>The grammar already covers it.</h3>
+        <ul>
+          <li><code>renewals</code> is a declared resource.</li>
+          <li><code>at_risk</code> is a declared filter.</li>
+          <li><code>rank_entities</code> and <code>summarize_findings</code> already work over admitted measures.</li>
+          <li><code>entity_list</code> and <code>detail_panel</code> already render this shape.</li>
+          <li>The user asks. The plan compiles. Done.</li>
+        </ul>
+        <p class="kicker">When the grammar <em>doesn't</em> cover it, you author once and unlock every future workspace.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 15 ·EASIER & HARDER ============ -->
+<section class="slide" data-eyebrow="easier & harder">
+  <div class="slide-inner">
+    <div class="tag">15 · the trade</div>
+    <h2 class="h-slide">Implementation flexibility for <em>declarative leverage</em>.</h2>
+
+    <div class="compare">
+      <div class="col">
+        <div class="col-label">Easier</div>
+        <h3>The long tail. Free.</h3>
+        <ul>
+          <li><strong>The long tail.</strong> Workspaces a user wants but aren't worth a page-week of effort.</li>
+          <li><strong>New surfaces over old data.</strong> The expense moves from building the view to getting the dimension declared cleanly.</li>
+          <li><strong>Removing dead surfaces.</strong> Routes you no longer need don't have to be maintained because they don't exist.</li>
+          <li><strong>Onboarding.</strong> The Manifest is one artifact a new engineer reads to understand the app.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="col-label cool">Harder</div>
+        <h3>Discipline shifts up.</h3>
+        <ul>
+          <li><strong>Declarative discipline.</strong> Vague resource names used to surface as LiveView bugs. Now they surface as plans you wouldn't have written.</li>
+          <li><strong>Cross-surface invariants.</strong> A caveat that used to live in one template now has to live in a constraint or pattern.</li>
+          <li><strong>Performance reasoning.</strong> A planner can compose patterns that hit your resolver harder than any hand-authored page would have.</li>
+          <li><strong>Pattern vs primitive.</strong> Precision you used to defer becomes precision the Manifest forces.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 16 ·PROMOTION PATH ============ -->
+<section class="slide" data-eyebrow="promotion">
+  <div class="slide-inner">
+    <div class="tag">16 · from workspace to route</div>
+    <h2 class="h-slide">Pages <em>start as workspaces</em>.</h2>
+
+    <div class="promote-path">
+      <div class="step"><div class="pn">stage 1</div><div class="pname">ad-hoc<br />surface</div></div>
+      <div class="arr">→</div>
+      <div class="step"><div class="pn">stage 2</div><div class="pname">saved<br />workspace</div></div>
+      <div class="arr">→</div>
+      <div class="step"><div class="pn">stage 3</div><div class="pname">shared<br />workspace</div></div>
+      <div class="arr">→</div>
+      <div class="step"><div class="pn">stage 4</div><div class="pname">promoted<br />workflow</div></div>
+      <div class="arr">→</div>
+      <div class="step last"><div class="pn">stage 5</div><div class="pname">authored<br />page</div></div>
+    </div>
+
+    <div class="body" style="margin-top: 1.6rem;">
+      <p>
+        This is what page-as-unit-of-work hid: pages were always hardened workspaces. We just had no way to know which workspaces deserved the hardening until users had been asking for them. Now they tell us, by what they ask for and how often.
+      </p>
+      <p>
+        The surface area of your app comes to reflect what people <em>actually do</em> with it, rather than what the team predicted at planning time.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 17 ·THE ROLE MOVES UP ============ -->
+<section class="slide" data-eyebrow="the role">
+  <div class="slide-inner">
+    <div class="tag">17 · the role moves up</div>
+    <h2 class="h-slide">Judgment moves up. <em>Authorship stays</em>.</h2>
+    <p class="dek" style="margin-top: 0.8rem;">
+      Not "developers do less." Developers do less of the busywork, and more of the work that was always the actual job.
+    </p>
+
+    <div class="role-rows">
+      <div class="role-l">moves to the user</div>
+      <div class="role-r">Which surface comes up, for what intent.</div>
+
+      <div class="role-l">moves to the planner</div>
+      <div class="role-r">Composition within a pattern set you authored.</div>
+
+      <div class="role-l">stays with you</div>
+      <div class="role-r">Schema, business logic, authorization, validation, security, observability, performance.</div>
+
+      <div class="role-l">becomes the engineering</div>
+      <div class="role-r">Choosing what to admit, what to gate, what's safe to vary.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 18 ·SHIPPED & ARGUED ============ -->
+<section class="slide" data-eyebrow="shipped & argued">
+  <div class="slide-inner">
+    <div class="tag">18 · what we're claiming</div>
+    <h2 class="h-slide">The next frontiers are <em>scope</em>, not soundness.</h2>
+
+    <div class="scope-grid">
+      <div class="scope-cell shipped">
+        <div class="head">Shipped, in v3</div>
+        <ul>
+          <li><code>WorkspacePlan</code> typed IR</li>
+          <li>Deterministic compiler</li>
+          <li>Snapshot &amp; rerun path (no model call)</li>
+          <li>Planner with validation-feedback retry</li>
+          <li>End-to-end CRM demo over real data</li>
+          <li>The read side of the architecture, end to end</li>
+        </ul>
+      </div>
+      <div class="scope-cell argued">
+        <div class="head">Argued, not yet shipped</div>
+        <ul>
+          <li>Manifest abstraction across arbitrary apps</li>
+          <li>Mutation surfaces (create / update / delete)</li>
+          <li>Confirmation, preview, reversibility flows</li>
+          <li>Workflow surfaces composing multiple operations</li>
+          <li>MCP admission path</li>
+          <li>Saved-workspace promotion path to routes</li>
+          <li>Pattern kit broad enough for general work</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 19 ·THE NEW SHAPE ============ -->
+<section class="slide" data-eyebrow="the new shape">
+  <div class="slide-inner">
+    <div class="tag">19 · the new shape of the work</div>
+    <h2 class="h-slide">What the work <em>actually looks like</em>.</h2>
+
+    <div class="steps">
+      <div class="step-row">
+        <div class="step-num">1</div>
+        <div class="step-text">Build the application normally: contexts, schemas, changesets, scopes.</div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">2</div>
+        <div class="step-text"><em>Declare its grammar:</em> resources, reads, mutations, constraints, patterns.</div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">3</div>
+        <div class="step-text">Let the planner map user intent into the grammar.</div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">4</div>
+        <div class="step-text">Let the compiler bind plans to surfaces.</div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">5</div>
+        <div class="step-text"><em>Promote</em> the workspaces users actually use.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 20 ·CLOSING ============ -->
+<section class="slide" data-eyebrow="in closing">
+  <div class="slide-inner">
+    <div class="tag">20 · in closing</div>
+
+    <div class="closing-build stagger">
+      <div class="line">You write the application.</div>
+      <div class="line">You declare its <em>grammar</em>.</div>
+      <div class="line">The planner picks the plan.</div>
+      <div class="line">The compiler produces the surface.</div>
+    </div>
+
+    <div class="closing-final reveal">
+      Build the app. Expose the <em>grammar</em>.<br />Let intent find its surface.
+    </div>
+
+    <div class="closing-links reveal">
+      <a href="./after-the-page.md">essay</a>
+      <a href="./index.html">the proposal deck</a>
+      <a href="../design/v3-developer-grammar.md">developer grammar</a>
+      <a href="../design/v3-thesis-results.md">thesis results</a>
+      <a href="https://github.com/mhyrr/resonance">github</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  (function () {
+    const deck   = document.getElementById('deck');
+    const slides = Array.from(deck.querySelectorAll('.slide'));
+    const cur    = document.getElementById('cur');
+    const tot    = document.getElementById('tot');
+    const eyeb   = document.getElementById('eyebrow');
+    const rail   = document.getElementById('rail');
+
+    tot.textContent = String(slides.length).padStart(2, '0');
+
+    slides.forEach((s, i) => {
+      const d = document.createElement('span');
+      d.className = 'dot';
+      d.setAttribute('data-i', String(i));
+      d.addEventListener('click', () => s.scrollIntoView({ behavior: 'smooth' }));
+      rail.appendChild(d);
+    });
+    const dots = Array.from(rail.querySelectorAll('.dot'));
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting && e.intersectionRatio > 0.5) {
+          const i = slides.indexOf(e.target);
+          cur.textContent = String(i + 1).padStart(2, '0');
+          const eye = e.target.getAttribute('data-eyebrow') || '';
+          eyeb.innerHTML = '<span class="lab">·</span> &nbsp;' + eye;
+          dots.forEach((d, j) => d.classList.toggle('active', j === i));
+          e.target.classList.add('visible');
+        }
+      });
+    }, { root: deck, threshold: [0.4, 0.5, 0.6] });
+    slides.forEach((s) => io.observe(s));
+
+    function indexAt() {
+      const sh = window.innerHeight;
+      return Math.round(deck.scrollTop / sh);
+    }
+    function go(d) {
+      const i = Math.max(0, Math.min(slides.length - 1, indexAt() + d));
+      slides[i].scrollIntoView({ behavior: 'smooth' });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      switch (e.key) {
+        case 'ArrowDown':
+        case 'PageDown':
+        case ' ':
+        case 'j':
+          e.preventDefault(); go(1); break;
+        case 'ArrowUp':
+        case 'PageUp':
+        case 'k':
+          e.preventDefault(); go(-1); break;
+        case 'Home':
+          e.preventDefault(); slides[0].scrollIntoView({ behavior: 'smooth' }); break;
+        case 'End':
+          e.preventDefault(); slides[slides.length - 1].scrollIntoView({ behavior: 'smooth' }); break;
+      }
+    });
+
+    slides[0].classList.add('visible');
+  })();
+</script>
+
+</body>
+</html>

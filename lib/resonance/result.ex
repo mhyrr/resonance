@@ -14,6 +14,7 @@ defmodule Resonance.Result do
   - `data` — flat normalized rows from the resolver (`[%{label, value, ...}]`)
   - `intent` — the `QueryIntent` that produced the data (for presenter context)
   - `summary` — computed stats: count, min, max, avg
+  - `format` — field-level display hints, e.g. `%{value: :currency}`
   - `metadata` — extensible; prose summaries put content here
   """
 
@@ -23,12 +24,13 @@ defmodule Resonance.Result do
           data: [map()],
           intent: Resonance.QueryIntent.t() | nil,
           summary: map(),
+          format: map(),
           metadata: map()
         }
 
   @derive Jason.Encoder
   @enforce_keys [:kind, :title]
-  defstruct [:kind, :title, :intent, data: [], summary: %{}, metadata: %{}]
+  defstruct [:kind, :title, :intent, data: [], summary: %{}, format: %{}, metadata: %{}]
 
   @doc """
   Compute summary statistics from a list of data rows.

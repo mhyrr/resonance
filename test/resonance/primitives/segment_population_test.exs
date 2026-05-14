@@ -68,6 +68,21 @@ defmodule Resonance.Primitives.SegmentPopulationTest do
     assert renderable.component == Resonance.Components.MetricGrid
   end
 
+  test "default presenter uses Result format metadata for metric values" do
+    result = %Resonance.Result{
+      kind: :segmentation,
+      title: "Revenue by owner",
+      data: [%{label: "A", value: 10}, %{label: "B", value: 20}],
+      format: %{value: :currency}
+    }
+
+    renderable = Resonance.Presenters.Default.present(result, %{})
+
+    assert renderable.component == Resonance.Components.MetricGrid
+    assert Enum.all?(renderable.props.metrics, &(&1.format == :currency))
+    assert renderable.props.format == %{value: :currency}
+  end
+
   test "default presenter picks data table for many segments" do
     result = %Resonance.Result{
       kind: :segmentation,

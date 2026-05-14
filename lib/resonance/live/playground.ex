@@ -211,8 +211,9 @@ defmodule Resonance.Live.Playground do
           LiveComponents — and after Resonance composes the page, the widgets are
           <em>just LiveComponents</em>: they call your contexts from
           <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">handle_event/3</code>,
-          subscribe to <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">Phoenix.PubSub</code>
-          for live updates, and handle mutations the way every other LiveComponent does.
+          receive parent-forwarded refreshes when
+          <code style="background: #f3f4f6; padding: 0.05rem 0.3rem; border-radius: 0.25rem;">Phoenix.PubSub</code>
+          says data changed, and handle mutations the way every other LiveComponent does.
           The library composes; Phoenix runs.
         </p>
         <p style="color: #4b5563; font-size: 0.95rem; line-height: 1.6; margin: 0 0 1rem;">
@@ -382,7 +383,8 @@ defmodule Resonance.Live.Playground do
   end
 
   defp list_item_style(selected, widget) do
-    base = "display: block; padding: 0.6rem 0.75rem; border-radius: 0.5rem; text-decoration: none; color: #1f2937; "
+    base =
+      "display: block; padding: 0.6rem 0.75rem; border-radius: 0.5rem; text-decoration: none; color: #1f2937; "
 
     if selected && selected.module == widget.module do
       base <> "background: #eff6ff; border: 1px solid #bfdbfe;"
@@ -408,7 +410,10 @@ defmodule Resonance.Live.Playground do
   defp mode_label(:none), do: "no data"
 
   defp render_source_label(_, :live), do: "playground_renderable/1"
-  defp render_source_label(%{example: ex}, :example) when not is_nil(ex), do: "example_renderable/0"
+
+  defp render_source_label(%{example: ex}, :example) when not is_nil(ex),
+    do: "example_renderable/0"
+
   defp render_source_label(_, _), do: "—"
 
   # --- Discovery ---

@@ -28,9 +28,8 @@ defmodule ResonanceDemoWeb.ExploreLive do
   def handle_event("simulate_deals", _params, socket) do
     {:ok, message} = Deals.simulate_batch()
 
-    # Re-run the same LLM tool calls against fresh data for any non-interactive
-    # widgets. Widgets that subscribed to the "deals" PubSub topic already
-    # updated themselves via the broadcast inside Deals.simulate_batch/0.
+    # Re-run the same LLM tool calls against fresh data. Live.Report forwards
+    # refreshed renderables to mounted widgets through their update/2 path.
     send_update(Resonance.Live.Report, id: "explore-report", refresh: true)
 
     {:noreply, assign(socket, data_flash: message)}
@@ -63,7 +62,10 @@ defmodule ResonanceDemoWeb.ExploreLive do
         class="mb-4 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between"
       >
         <span>{@data_flash}</span>
-        <button phx-click="dismiss_flash" class="text-emerald-600 hover:text-emerald-800 ml-4 cursor-pointer">
+        <button
+          phx-click="dismiss_flash"
+          class="text-emerald-600 hover:text-emerald-800 ml-4 cursor-pointer"
+        >
           &times;
         </button>
       </div>
@@ -92,5 +94,4 @@ defmodule ResonanceDemoWeb.ExploreLive do
     </div>
     """
   end
-
 end

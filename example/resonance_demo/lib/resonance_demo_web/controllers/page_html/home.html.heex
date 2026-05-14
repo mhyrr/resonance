@@ -62,6 +62,26 @@
     <p class="mt-4 leading-7 text-base-content/70">
       Build rich, interactive web applications quickly, with less code and fewer moving parts. Join our growing community of developers using Phoenix to craft APIs, HTML5 apps and more, for fun or at scale.
     </p>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <.link
+        navigate={~p"/workspace"}
+        class="rounded-md bg-base-content px-4 py-2 text-sm font-semibold text-base-100 hover:bg-base-content/80"
+      >
+        Open Workspace Demo
+      </.link>
+      <.link
+        navigate={~p"/planner-eval"}
+        class="rounded-md border border-base-content/20 px-4 py-2 text-sm font-semibold text-base-content hover:bg-base-200"
+      >
+        Open Planner Eval
+      </.link>
+      <.link
+        navigate={~p"/explore"}
+        class="rounded-md border border-base-content/20 px-4 py-2 text-sm font-semibold text-base-content hover:bg-base-200"
+      >
+        Open Prompt Explorer
+      </.link>
+    </div>
     <div class="flex">
       <div class="w-full sm:w-auto">
         <div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">

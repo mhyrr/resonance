@@ -135,6 +135,8 @@ defmodule Resonance.QueryIntent do
     end)
   end
 
+  defp normalize_filters(filters), do: filters
+
   defp normalize_sort(nil), do: nil
 
   defp normalize_sort(%{"field" => f, "direction" => "asc"}), do: %{field: f, direction: :asc}

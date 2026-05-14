@@ -74,7 +74,13 @@ mix setup
 mix phx.server    # localhost:4000
 ```
 
-Requires `ANTHROPIC_API_KEY` environment variable.
+The natural-language `/explore` path requires an `ANTHROPIC_API_KEY`
+environment variable.
+
+The deterministic v3 workspace demo is available at `/workspace`. It compiles
+the app-owned `ResonanceDemo.Workspaces.pipeline_review/0` plan into existing
+renderables, serializes the snapshot in the LiveView, and reruns the stored
+tool-call sources against changed CRM data. This path does not call an LLM.
 
 ## Interactive Features
 

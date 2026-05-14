@@ -82,5 +82,4 @@ defmodule Resonance.ComposerTest do
     assert {:ok, [%Renderable{status: :error, error: :database_down}]} =
              Composer.compose(tool_calls, %{resolver: FailingResolver})
   end
-
 end
